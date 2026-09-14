@@ -105,6 +105,17 @@ export interface Card {
   status: CardStatus
   /** ISO 8601, always UTC. */
   createdAt: string
+  /** Oldest first. Answers "what happened to that card last Tuesday". */
+  history: CardEvent[]
+}
+
+/** One entry in a card's audit trail. Append-only: nothing rewrites history. */
+export interface CardEvent {
+  /** ISO 8601, always UTC. Display converts to the merchant's timezone. */
+  at: string
+  action: "issued" | CardStatus
+  /** Absent on `issued`, which has no prior state. */
+  from?: CardStatus
 }
 
 export interface PaymentFilters {

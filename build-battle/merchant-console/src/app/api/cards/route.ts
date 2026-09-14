@@ -20,18 +20,12 @@ export async function POST(request: NextRequest) {
   try {
     body = await request.json()
   } catch {
-    return NextResponse.json(
-      { message: "Send a JSON body." },
-      { status: 400 },
-    )
+    return NextResponse.json({ message: "Send a JSON body." }, { status: 400 })
   }
 
   // The client is not trusted: merchant, currency, limit and category are all
   // checked against allowlists before anything reaches the store (ORG-7).
-  const parsed = parseIssueRequest(
-    body,
-    merchants.map((merchant) => merchant.id),
-  )
+  const parsed = parseIssueRequest(body, merchants)
 
   if (!parsed.ok) {
     return NextResponse.json(
@@ -40,11 +34,14 @@ export async function POST(request: NextRequest) {
     )
   }
 
-  const { card, number } = issueCard(parsed.value)
+  const { card, number, replayed } = issueCard(parsed.value)
+
+  // A replay is 200, not 201: it created nothing. It also carries no number,
+  // so a retry cannot be used to read the reveal a second time.
   return NextResponse.json(
-    { card, number },
+    { card, number, replayed },
     // no-store so the one response carrying a live number is not held by a
     // browser or proxy cache after the reveal panel has closed.
-    { status: 201, headers: { "cache-control": "no-store" } },
+    { status: replayed ? 200 : 201, headers: { "cache-control": "no-store" } },
   )
 }

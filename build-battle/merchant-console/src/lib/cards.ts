@@ -136,6 +136,12 @@ export interface IssueCardInput {
   spendLimit: number
   currency: Currency
   category: CardCategory | null
+  /**
+   * Caller-supplied key that makes issuing idempotent. A retry — a double
+   * click, a flaky connection, an impatient reload — carries the same key and
+   * gets the same card back instead of minting a second one.
+   */
+  requestId: string | null
 }
 
 export type FieldErrors = Partial<
@@ -157,7 +163,7 @@ export type ParseResult =
  */
 export function parseIssueRequest(
   body: unknown,
-  merchantIds: readonly string[],
+  merchants: readonly { id: string; currency: Currency }[],
 ): ParseResult {
   const errors: FieldErrors = {}
   const input = (body ?? {}) as Record<string, unknown>
@@ -172,9 +178,10 @@ export function parseIssueRequest(
 
   const merchantId =
     typeof input.merchantId === "string" ? input.merchantId : ""
+  const merchant = merchants.find((entry) => entry.id === merchantId) ?? null
   if (!merchantId) {
     errors.merchantId = "Choose a merchant."
-  } else if (!merchantIds.includes(merchantId)) {
+  } else if (!merchant) {
     errors.merchantId = "That merchant does not exist."
   }
 
@@ -190,11 +197,20 @@ export function parseIssueRequest(
   const currency = input.currency
   if (!CARD_CURRENCIES.includes(currency as Currency)) {
     errors.currency = "Cards are issued in USD, EUR or GBP."
+  } else if (merchant && currency !== merchant.currency) {
+    // A card settles where its merchant settles. Allowing a GBP card against
+    // a USD merchant would mean one relationship carrying two currencies, and
+    // the money rule forbids summing across currencies without converting.
+    errors.currency = `That merchant settles in ${merchant.currency}.`
   }
 
   // Absent is fine; present-but-unknown is not.
   let category: CardCategory | null = null
-  if (input.category !== undefined && input.category !== null && input.category !== "") {
+  if (
+    input.category !== undefined &&
+    input.category !== null &&
+    input.category !== ""
+  ) {
     if (CARD_CATEGORIES.includes(input.category as CardCategory)) {
       category = input.category as CardCategory
     } else {
@@ -212,6 +228,10 @@ export function parseIssueRequest(
       spendLimit: spendLimit as number,
       currency: currency as Currency,
       category,
+      requestId:
+        typeof input.requestId === "string" && input.requestId.trim()
+          ? input.requestId.trim()
+          : null,
     },
   }
 }

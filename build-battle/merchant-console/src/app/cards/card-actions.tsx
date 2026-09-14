@@ -6,16 +6,18 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 /**
- * Freeze and unfreeze from the list, without a full page reload:
+ * Freeze, unfreeze and cancel from the list, without a full page reload:
  * router.refresh() re-renders the server component in place.
  *
  * The server owns the state machine — this only offers the moves that are
  * legal from where the card is, and a refused move surfaces its reason.
+ * Cancelling is irreversible, so it asks first.
  */
 export function CardActions({ card }: { card: Card }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
 
   // cancelled is terminal, so there is nothing to offer.
   if (card.status === "cancelled") {
@@ -36,6 +38,7 @@ export function CardActions({ card }: { card: Card }) {
         setError(payload?.message ?? "That did not work.")
         return
       }
+      setConfirming(false)
       router.refresh()
     } catch {
       setError("Could not reach the server.")
@@ -44,8 +47,31 @@ export function CardActions({ card }: { card: Card }) {
     }
   }
 
-  const next: CardStatus = card.status === "active" ? "frozen" : "active"
-  const label = card.status === "active" ? "Freeze" : "Unfreeze"
+  if (confirming) {
+    return (
+      <div className="flex items-center justify-end gap-2">
+        <span className="text-sm text-gray-500">Cancel for good?</span>
+        <Button
+          variant="secondary"
+          className="py-1"
+          disabled={busy}
+          onClick={() => setConfirming(false)}
+        >
+          Keep
+        </Button>
+        <Button
+          variant="destructive"
+          className="py-1"
+          disabled={busy}
+          onClick={() => move("cancelled")}
+        >
+          Cancel card
+        </Button>
+      </div>
+    )
+  }
+
+  const frozen = card.status === "frozen"
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -58,9 +84,17 @@ export function CardActions({ card }: { card: Card }) {
         variant="secondary"
         className="py-1"
         disabled={busy}
-        onClick={() => move(next)}
+        onClick={() => move(frozen ? "active" : "frozen")}
       >
-        {label}
+        {frozen ? "Unfreeze" : "Freeze"}
+      </Button>
+      <Button
+        variant="ghost"
+        className="py-1 text-red-600 hover:text-red-700 dark:text-red-400"
+        disabled={busy}
+        onClick={() => setConfirming(true)}
+      >
+        Cancel
       </Button>
     </div>
   )

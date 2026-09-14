@@ -20,7 +20,12 @@ import {
  * check digit, over enough samples that a bad branch cannot hide.
  */
 
-const MERCHANT_IDS = ["mch_01", "mch_02"]
+// Objects, not ids: a card must settle in its merchant's currency, so the
+// parser needs the currency to check it against.
+const MERCHANTS = [
+  { id: "mch_01", currency: "USD" },
+  { id: "mch_02", currency: "EUR" },
+] as const
 
 const valid = {
   nickname: "Ad spend",
@@ -143,7 +148,7 @@ describe("the card state machine", () => {
 
 describe("parseIssueRequest", () => {
   it("accepts a well-formed request", () => {
-    const result = parseIssueRequest(valid, MERCHANT_IDS)
+    const result = parseIssueRequest(valid, MERCHANTS)
     expect(result.ok).toBe(true)
     if (result.ok) {
       expect(result.value.spendLimit).toBe(25000)
@@ -152,13 +157,13 @@ describe("parseIssueRequest", () => {
   })
 
   it("rejects a missing merchant, and an unknown one", () => {
-    const missing = parseIssueRequest({ ...valid, merchantId: "" }, MERCHANT_IDS)
+    const missing = parseIssueRequest({ ...valid, merchantId: "" }, MERCHANTS)
     expect(missing.ok).toBe(false)
     if (!missing.ok) expect(missing.errors.merchantId).toBeDefined()
 
     const unknown = parseIssueRequest(
       { ...valid, merchantId: "mch_nope" },
-      MERCHANT_IDS,
+      MERCHANTS,
     )
     expect(unknown.ok).toBe(false)
     if (!unknown.ok) expect(unknown.errors.merchantId).toBeDefined()
@@ -166,7 +171,7 @@ describe("parseIssueRequest", () => {
 
   it("rejects a zero or negative limit", () => {
     for (const spendLimit of [0, -1, -25000]) {
-      const result = parseIssueRequest({ ...valid, spendLimit }, MERCHANT_IDS)
+      const result = parseIssueRequest({ ...valid, spendLimit }, MERCHANTS)
       expect(result.ok).toBe(false)
       if (!result.ok) expect(result.errors.spendLimit).toBeDefined()
     }
@@ -175,20 +180,20 @@ describe("parseIssueRequest", () => {
   it("rejects a limit above 5,000,000 minor units but accepts exactly that", () => {
     const over = parseIssueRequest(
       { ...valid, spendLimit: MAX_SPEND_LIMIT + 1 },
-      MERCHANT_IDS,
+      MERCHANTS,
     )
     expect(over.ok).toBe(false)
     if (!over.ok) expect(over.errors.spendLimit).toBeDefined()
 
     expect(
-      parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANT_IDS)
+      parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANTS)
         .ok,
     ).toBe(true)
   })
 
   it("rejects a limit that is not an integer number of minor units", () => {
     for (const spendLimit of [250.5, "25000", NaN, Infinity, null]) {
-      const result = parseIssueRequest({ ...valid, spendLimit }, MERCHANT_IDS)
+      const result = parseIssueRequest({ ...valid, spendLimit }, MERCHANTS)
       expect(result.ok).toBe(false)
       if (!result.ok) expect(result.errors.spendLimit).toBeDefined()
     }
@@ -196,41 +201,82 @@ describe("parseIssueRequest", () => {
 
   it("rejects a currency we do not issue in", () => {
     for (const currency of ["JPY", "usd", "", undefined, 1]) {
-      const result = parseIssueRequest({ ...valid, currency }, MERCHANT_IDS)
+      const result = parseIssueRequest({ ...valid, currency }, MERCHANTS)
       expect(result.ok).toBe(false)
       if (!result.ok) expect(result.errors.currency).toBeDefined()
     }
   })
 
   it("requires a nickname and caps its length", () => {
-    expect(parseIssueRequest({ ...valid, nickname: "   " }, MERCHANT_IDS).ok).toBe(
+    expect(parseIssueRequest({ ...valid, nickname: "   " }, MERCHANTS).ok).toBe(
       false,
     )
     expect(
-      parseIssueRequest({ ...valid, nickname: "x".repeat(61) }, MERCHANT_IDS).ok,
+      parseIssueRequest({ ...valid, nickname: "x".repeat(61) }, MERCHANTS).ok,
     ).toBe(false)
   })
 
   it("takes a known category and refuses an invented one", () => {
-    const ok = parseIssueRequest(
-      { ...valid, category: "software" },
-      MERCHANT_IDS,
-    )
+    const ok = parseIssueRequest({ ...valid, category: "software" }, MERCHANTS)
     expect(ok.ok).toBe(true)
     if (ok.ok) expect(ok.value.category).toBe("software")
 
-    const bad = parseIssueRequest(
-      { ...valid, category: "gambling" },
-      MERCHANT_IDS,
-    )
+    const bad = parseIssueRequest({ ...valid, category: "gambling" }, MERCHANTS)
     expect(bad.ok).toBe(false)
     if (!bad.ok) expect(bad.errors.category).toBeDefined()
+  })
+
+  it("refuses a currency the chosen merchant does not settle in", () => {
+    // One relationship, one currency: a GBP card against a USD merchant would
+    // put two currencies on one merchant and invite a cross-currency sum.
+    const mismatch = parseIssueRequest(
+      { ...valid, merchantId: "mch_02", currency: "USD" },
+      MERCHANTS,
+    )
+    expect(mismatch.ok).toBe(false)
+    if (!mismatch.ok) expect(mismatch.errors.currency).toContain("EUR")
+
+    expect(
+      parseIssueRequest(
+        { ...valid, merchantId: "mch_02", currency: "EUR" },
+        MERCHANTS,
+      ).ok,
+    ).toBe(true)
+  })
+
+  it("does not blame the currency when the merchant is the unknown one", () => {
+    // Otherwise a typo in the merchant reports two errors and the operator
+    // fixes the wrong field.
+    const result = parseIssueRequest(
+      { ...valid, merchantId: "mch_nope" },
+      MERCHANTS,
+    )
+    expect(result.ok).toBe(false)
+    if (!result.ok) {
+      expect(result.errors.merchantId).toBeDefined()
+      expect(result.errors.currency).toBeUndefined()
+    }
+  })
+
+  it("carries an idempotency key through, and normalises its absence", () => {
+    const withKey = parseIssueRequest(
+      { ...valid, requestId: " abc " },
+      MERCHANTS,
+    )
+    expect(withKey.ok).toBe(true)
+    if (withKey.ok) expect(withKey.value.requestId).toBe("abc")
+
+    for (const requestId of [undefined, null, "", "   ", 7]) {
+      const result = parseIssueRequest({ ...valid, requestId }, MERCHANTS)
+      expect(result.ok).toBe(true)
+      if (result.ok) expect(result.value.requestId).toBeNull()
+    }
   })
 
   it("reports every bad field at once rather than the first", () => {
     const result = parseIssueRequest(
       { nickname: "", merchantId: "", spendLimit: -5, currency: "JPY" },
-      MERCHANT_IDS,
+      MERCHANTS,
     )
     expect(result.ok).toBe(false)
     if (!result.ok) {
@@ -245,7 +291,7 @@ describe("parseIssueRequest", () => {
 
   it("survives an absent or junk body instead of throwing", () => {
     for (const body of [undefined, null, "nope", 7, []]) {
-      expect(parseIssueRequest(body, MERCHANT_IDS).ok).toBe(false)
+      expect(parseIssueRequest(body, MERCHANTS).ok).toBe(false)
     }
   })
 })

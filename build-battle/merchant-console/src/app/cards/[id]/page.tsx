@@ -4,6 +4,7 @@ import { cardById } from "@/data/cards"
 import { merchantById } from "@/data/merchants"
 import {
   CARD_CATEGORY_LABELS,
+  CARD_STATUS_LABELS,
   isSpendWarning,
   maskedNumber,
   spendPercent,
@@ -13,6 +14,33 @@ import { formatMoney } from "@/lib/money"
 import { cx } from "@/lib/utils"
 import Link from "next/link"
 import { notFound } from "next/navigation"
+
+/** One row of the card record. Eight of these, so it is worth a name. */
+function Row({
+  label,
+  children,
+  wide,
+  mono,
+}: {
+  label: string
+  children: React.ReactNode
+  wide?: boolean
+  mono?: boolean
+}) {
+  return (
+    <div className={wide ? "sm:col-span-2" : undefined}>
+      <dt className="text-sm text-gray-500">{label}</dt>
+      <dd
+        className={cx(
+          "text-sm text-gray-900 dark:text-gray-50",
+          mono ? "font-mono" : "font-medium tabular-nums",
+        )}
+      >
+        {children}
+      </dd>
+    </div>
+  )
+}
 
 export default async function CardDetail({
   params,
@@ -27,6 +55,7 @@ export default async function CardDetail({
   const percent = spendPercent(card)
   const warning = isSpendWarning(card)
   const remaining = Math.max(0, card.spendLimit - card.spent)
+  const zone = merchant?.timezone ?? "UTC"
 
   return (
     <div className="p-4 sm:p-6">
@@ -79,9 +108,7 @@ export default async function CardDetail({
           <div
             className={cx(
               "h-full rounded-full transition-all",
-              warning
-                ? "bg-amber-500 dark:bg-amber-500"
-                : "bg-blue-500 dark:bg-blue-500",
+              warning ? "bg-amber-500" : "bg-blue-500",
             )}
             style={{ width: `${percent}%` }}
           />
@@ -97,59 +124,61 @@ export default async function CardDetail({
       <Divider />
 
       <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-        <div>
-          <dt className="text-sm text-gray-500">Merchant</dt>
-          <dd className="text-sm font-medium text-gray-900 dark:text-gray-50">
-            {merchant?.name ?? card.merchantId}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-gray-500">Spend limit</dt>
-          <dd className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-50">
-            {formatMoney(card.spendLimit, card.currency)} {card.currency}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-gray-500">Spent</dt>
-          <dd className="text-sm font-medium tabular-nums text-gray-900 dark:text-gray-50">
-            {formatMoney(card.spent, card.currency)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-gray-500">Number</dt>
-          <dd className="font-mono text-sm text-gray-900 dark:text-gray-50">
-            {maskedNumber(card.last4)}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-gray-500">Reference</dt>
-          <dd className="font-mono text-sm text-gray-900 dark:text-gray-50">
-            {card.reference}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-gray-500">Category lock</dt>
-          <dd className="text-sm font-medium text-gray-900 dark:text-gray-50">
-            {card.category ? CARD_CATEGORY_LABELS[card.category] : "None"}
-          </dd>
-        </div>
-        <div>
-          <dt className="text-sm text-gray-500">Status</dt>
-          <dd className="text-sm font-medium capitalize text-gray-900 dark:text-gray-50">
-            {card.status}
-          </dd>
-        </div>
-        <div className="sm:col-span-2">
-          <dt className="text-sm text-gray-500">
-            Created{merchant ? ` (${merchant.timezone})` : ""}
-          </dt>
-          <dd className="text-sm font-medium text-gray-900 dark:text-gray-50">
-            {merchant
-              ? formatInZone(card.createdAt, merchant.timezone)
-              : card.createdAt}
-          </dd>
-        </div>
+        <Row label="Merchant">{merchant?.name ?? card.merchantId}</Row>
+        <Row label="Spend limit">
+          {formatMoney(card.spendLimit, card.currency)} {card.currency}
+        </Row>
+        <Row label="Spent">{formatMoney(card.spent, card.currency)}</Row>
+        <Row label="Number" mono>
+          {maskedNumber(card.last4)}
+        </Row>
+        <Row label="Reference" mono>
+          {card.reference}
+        </Row>
+        <Row label="Category lock">
+          {card.category ? CARD_CATEGORY_LABELS[card.category] : "None"}
+        </Row>
+        <Row label="Status">{CARD_STATUS_LABELS[card.status]}</Row>
+        <Row label={`Created (${zone})`} wide>
+          {formatInZone(card.createdAt, zone)}
+        </Row>
       </dl>
+
+      <Divider />
+
+      <section aria-labelledby="history-heading">
+        <h2
+          id="history-heading"
+          className="text-sm font-semibold text-gray-900 dark:text-gray-50"
+        >
+          History
+        </h2>
+        <p className="mt-1 text-sm text-gray-500">
+          Every status this card has held, in {zone}.
+        </p>
+        <ol className="mt-3 space-y-2">
+          {card.history.map((event, index) => (
+            <li
+              key={`${event.at}-${index}`}
+              className="flex flex-wrap items-baseline gap-x-3 text-sm"
+            >
+              <span className="w-56 shrink-0 tabular-nums text-gray-500">
+                {formatInZone(event.at, zone)}
+              </span>
+              <span className="font-medium text-gray-900 dark:text-gray-50">
+                {event.action === "issued"
+                  ? "Issued"
+                  : CARD_STATUS_LABELS[event.action]}
+              </span>
+              {event.from && (
+                <span className="text-gray-500">
+                  from {CARD_STATUS_LABELS[event.from]}
+                </span>
+              )}
+            </li>
+          ))}
+        </ol>
+      </section>
 
       <p className="mt-6 text-sm text-gray-500">
         The full number was shown once, when this card was issued. Only the last

@@ -43,11 +43,45 @@ import { useState } from "react"
 
 const NONE = "__none__"
 
-export function IssueCardDialog({
-  merchants,
+type Merchant = { id: string; name: string; currency: Currency }
+
+/** One labelled control with its error. Five of these, so it is worth a name. */
+function Field({
+  id,
+  label,
+  hint,
+  error,
+  children,
 }: {
-  merchants: { id: string; name: string; currency: Currency }[]
+  id: string
+  label: string
+  hint?: string
+  error?: string
+  children: React.ReactNode
 }) {
+  return (
+    <div>
+      <label
+        htmlFor={id}
+        className="text-sm font-medium text-gray-900 dark:text-gray-50"
+      >
+        {label}
+        {hint && <span className="font-normal text-gray-500"> {hint}</span>}
+      </label>
+      <div className="mt-1.5">{children}</div>
+      {error && (
+        <p
+          id={`${id}-error`}
+          className="mt-1 text-sm text-red-600 dark:text-red-400"
+        >
+          {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
+export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
   const router = useRouter()
 
   const [open, setOpen] = useState(false)
@@ -63,6 +97,14 @@ export function IssueCardDialog({
   const [issued, setIssued] = useState<{ card: Card; number: string } | null>(
     null,
   )
+  // Held across retries so a resubmitted form cannot mint a second card. A new
+  // key is drawn only once a card has actually been issued.
+  const [requestId, setRequestId] = useState(() => crypto.randomUUID())
+
+  const selected = merchants.find((entry) => entry.id === merchantId) ?? null
+  // A card settles where its merchant settles, and the server enforces it, so
+  // the control offers only what would be accepted rather than inviting a 400.
+  const choices = selected ? [selected.currency] : CARD_CURRENCIES
 
   const reset = () => {
     setNickname("")
@@ -73,6 +115,7 @@ export function IssueCardDialog({
     setErrors({})
     setFormError(null)
     setIssued(null) // the reveal does not survive the drawer closing
+    setRequestId(crypto.randomUUID())
   }
 
   const onOpenChange = (next: boolean) => {
@@ -104,6 +147,7 @@ export function IssueCardDialog({
           spendLimit,
           currency,
           category: category === NONE ? null : category,
+          requestId,
         }),
       })
 
@@ -123,8 +167,6 @@ export function IssueCardDialog({
       setSaving(false)
     }
   }
-
-  const selectedMerchant = merchants.find((m) => m.id === merchantId)
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange}>
@@ -198,13 +240,11 @@ export function IssueCardDialog({
                 </p>
               )}
 
-              <div>
-                <label
-                  htmlFor="card-nickname"
-                  className="text-sm font-medium text-gray-900 dark:text-gray-50"
-                >
-                  Nickname
-                </label>
+              <Field
+                id="card-nickname"
+                label="Nickname"
+                error={errors.nickname}
+              >
                 <Input
                   id="card-nickname"
                   value={nickname}
@@ -214,35 +254,24 @@ export function IssueCardDialog({
                   aria-describedby={
                     errors.nickname ? "card-nickname-error" : undefined
                   }
-                  className="mt-1.5"
                 />
-                {errors.nickname && (
-                  <p
-                    id="card-nickname-error"
-                    className="mt-1 text-sm text-red-600 dark:text-red-400"
-                  >
-                    {errors.nickname}
-                  </p>
-                )}
-              </div>
+              </Field>
 
-              <div>
-                <label
-                  htmlFor="card-merchant"
-                  className="text-sm font-medium text-gray-900 dark:text-gray-50"
-                >
-                  Merchant
-                </label>
+              <Field
+                id="card-merchant"
+                label="Merchant"
+                error={errors.merchantId}
+              >
                 <Select
                   value={merchantId}
                   onValueChange={(value) => {
                     setMerchantId(value)
-                    // Default to how that merchant settles; still editable.
+                    // A card settles how its merchant settles.
                     const merchant = merchants.find((m) => m.id === value)
                     if (merchant) setCurrency(merchant.currency)
                   }}
                 >
-                  <SelectTrigger id="card-merchant" className="mt-1.5">
+                  <SelectTrigger id="card-merchant">
                     <SelectValue placeholder="Choose a merchant" />
                   </SelectTrigger>
                   <SelectContent>
@@ -253,21 +282,14 @@ export function IssueCardDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.merchantId && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.merchantId}
-                  </p>
-                )}
-              </div>
+              </Field>
 
               <div className="grid grid-cols-[1fr_7rem] gap-3">
-                <div>
-                  <label
-                    htmlFor="card-limit"
-                    className="text-sm font-medium text-gray-900 dark:text-gray-50"
-                  >
-                    Spend limit
-                  </label>
+                <Field
+                  id="card-limit"
+                  label="Spend limit"
+                  error={errors.spendLimit}
+                >
                   <Input
                     id="card-limit"
                     inputMode="decimal"
@@ -278,63 +300,45 @@ export function IssueCardDialog({
                     aria-describedby={
                       errors.spendLimit ? "card-limit-error" : undefined
                     }
-                    className="mt-1.5"
                   />
-                </div>
-                <div>
-                  <label
-                    htmlFor="card-currency"
-                    className="text-sm font-medium text-gray-900 dark:text-gray-50"
-                  >
-                    Currency
-                  </label>
+                </Field>
+                <Field
+                  id="card-currency"
+                  label="Currency"
+                  error={errors.currency}
+                >
                   <Select
                     value={currency}
                     onValueChange={(value) => setCurrency(value as Currency)}
                   >
-                    <SelectTrigger id="card-currency" className="mt-1.5">
+                    <SelectTrigger id="card-currency">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      {CARD_CURRENCIES.map((code) => (
+                      {choices.map((code) => (
                         <SelectItem key={code} value={code}>
                           {code}
                         </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
-                </div>
+                </Field>
               </div>
-              {errors.spendLimit && (
-                <p
-                  id="card-limit-error"
-                  className="-mt-2 text-sm text-red-600 dark:text-red-400"
-                >
-                  {errors.spendLimit}
-                </p>
-              )}
-              {errors.currency && (
-                <p className="-mt-2 text-sm text-red-600 dark:text-red-400">
-                  {errors.currency}
-                </p>
-              )}
-              {selectedMerchant && selectedMerchant.currency !== currency && (
+              {selected && (
                 <p className="-mt-2 text-sm text-gray-500">
-                  {selectedMerchant.name} settles in{" "}
-                  {selectedMerchant.currency}.
+                  {selected.name} settles in {selected.currency}, so the card
+                  does too.
                 </p>
               )}
 
-              <div>
-                <label
-                  htmlFor="card-category"
-                  className="text-sm font-medium text-gray-900 dark:text-gray-50"
-                >
-                  Category lock{" "}
-                  <span className="font-normal text-gray-500">(optional)</span>
-                </label>
+              <Field
+                id="card-category"
+                label="Category lock"
+                hint="(optional)"
+                error={errors.category}
+              >
                 <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger id="card-category" className="mt-1.5">
+                  <SelectTrigger id="card-category">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -346,12 +350,7 @@ export function IssueCardDialog({
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.category && (
-                  <p className="mt-1 text-sm text-red-600 dark:text-red-400">
-                    {errors.category}
-                  </p>
-                )}
-              </div>
+              </Field>
             </DrawerBody>
 
             <DrawerFooter className="gap-2 sm:flex-row sm:justify-end">
