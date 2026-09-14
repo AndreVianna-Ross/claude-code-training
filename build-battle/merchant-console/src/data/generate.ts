@@ -1,5 +1,7 @@
+import { cardReference, generateCardNumber } from "@/lib/cards"
 import { merchants } from "./merchants"
 import {
+  Card,
   Currency,
   Dispute,
   Payment,
@@ -148,7 +150,80 @@ export function generate() {
   }
 
   const payouts = generatePayouts(payments)
-  return { payments, refunds, disputes, payouts }
+  const cards = generateCards()
+  return { payments, refunds, disputes, payouts, cards }
+}
+
+/**
+ * A few cards already issued, so the list, the detail page and the spend bar
+ * have something to show before anyone clicks Issue. One sits past 80% of its
+ * limit, which is the case the progress bar warns on.
+ *
+ * Numbers come from the real server-side generator and are discarded the
+ * moment the last four is taken — the seed holds no full number either.
+ */
+function generateCards(): Card[] {
+  const seeds: {
+    nickname: string
+    merchantIndex: number
+    spendLimit: number
+    spent: number
+    category: Card["category"]
+    status: Card["status"]
+    daysAgo: number
+  }[] = [
+    {
+      nickname: "Google Ads",
+      merchantIndex: 0,
+      spendLimit: 250_000,
+      spent: 218_400,
+      category: "advertising",
+      status: "active",
+      daysAgo: 28,
+    },
+    {
+      nickname: "Figma seats",
+      merchantIndex: 2,
+      spendLimit: 60_000,
+      spent: 14_900,
+      category: "software",
+      status: "active",
+      daysAgo: 12,
+    },
+    {
+      nickname: "Contractor — Q3 audit",
+      merchantIndex: 4,
+      spendLimit: 500_000,
+      spent: 0,
+      category: "contractors",
+      status: "frozen",
+      daysAgo: 3,
+    },
+  ]
+
+  return seeds.map((seed, index) => {
+    const merchant = merchants[seed.merchantIndex]
+    const number = generateCardNumber(rand)
+    // Pinned to GENERATED_AT like every other seed in this module, so the
+    // seeded dates do not drift with the wall clock between two runs.
+    const createdAt = new Date(
+      GENERATED_AT.getTime() - seed.daysAgo * 86_400_000,
+    ).toISOString()
+
+    return {
+      id: `card_${String(index + 1).padStart(4, "0")}`,
+      nickname: seed.nickname,
+      merchantId: merchant.id,
+      spendLimit: seed.spendLimit,
+      spent: seed.spent,
+      currency: merchant.currency,
+      last4: number.slice(-4),
+      reference: cardReference(rand),
+      category: seed.category,
+      status: seed.status,
+      createdAt,
+    }
+  })
 }
 
 function generatePayouts(payments: Payment[]): Payout[] {
