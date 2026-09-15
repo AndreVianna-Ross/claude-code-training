@@ -24,12 +24,14 @@ export interface Merchant {
 export interface Payment {
   id: string
   merchantId: string
+  /** Integer minor units. Never a float. */
   amount: number
   currency: Currency
   status: PaymentStatus
   method: "card" | "wallet" | "bank_transfer"
   cardBrand: "visa" | "mastercard" | "amex" | null
   last4: string | null
+  /** ISO 8601, always UTC. */
   createdAt: string
   description: string
 }
