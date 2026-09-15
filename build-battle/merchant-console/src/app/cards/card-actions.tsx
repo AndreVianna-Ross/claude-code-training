@@ -35,14 +35,11 @@ export function CardActions({ card }: { card: Card }) {
 
   const frozen = card.status === "frozen"
   const label = frozen ? "Unfreeze" : "Freeze"
+  const errorClass = "text-sm text-red-600 dark:text-red-400"
 
   return (
     <div className="flex items-center justify-end gap-2">
-      {error && (
-        <span role="alert" className="text-sm text-red-600 dark:text-red-400">
-          {error}
-        </span>
-      )}
+      {error && <span role="alert" className={errorClass}>{error}</span>}
       <Button
         variant="secondary"
         className="py-1"

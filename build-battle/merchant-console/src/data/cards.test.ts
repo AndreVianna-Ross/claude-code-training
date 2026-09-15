@@ -64,18 +64,12 @@ describe("transitionCard", () => {
     expect(transitionCard(card.id, "active").ok).toBe(true)
     expect(transitionCard(card.id, "cancelled").ok).toBe(true)
 
-    expect(transitionCard(card.id, "active")).toEqual({
-      ok: false,
-      reason: "illegal",
-    })
+    expect(transitionCard(card.id, "active")).toEqual({ ok: false, reason: "illegal" })
     expect(card.status).toBe("cancelled")
   })
 
   it("reports an unknown card rather than throwing", () => {
-    expect(transitionCard("card_nope", "frozen")).toEqual({
-      ok: false,
-      reason: "not_found",
-    })
+    expect(transitionCard("card_nope", "frozen")).toEqual({ ok: false, reason: "not_found" })
   })
 })
 

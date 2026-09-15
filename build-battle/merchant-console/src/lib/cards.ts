@@ -1,13 +1,17 @@
 import { Card, CardCategory, CardStatus, Currency } from "@/data/types"
 
 export const CARD_CURRENCIES: readonly Currency[] = ["USD", "EUR", "GBP"]
-export const CARD_CATEGORIES: readonly CardCategory[] = [
-  "advertising",
-  "software",
-  "travel",
-  "contractors",
-  "utilities",
-]
+export const CARD_CATEGORY_LABELS: Record<CardCategory, string> = {
+  advertising: "Advertising",
+  software: "Software",
+  travel: "Travel",
+  contractors: "Contractors",
+  utilities: "Utilities",
+}
+
+export const CARD_CATEGORIES = Object.keys(
+  CARD_CATEGORY_LABELS,
+) as readonly CardCategory[]
 
 export const MAX_SPEND_LIMIT = 5_000_000
 export const NICKNAME_MAX = 60
@@ -21,9 +25,8 @@ export const CARD_TRANSITIONS: Record<CardStatus, readonly CardStatus[]> = {
 export const canTransition = (from: CardStatus, to: CardStatus): boolean =>
   CARD_TRANSITIONS[from].includes(to)
 
-export function isCardStatus(value: unknown): value is CardStatus {
-  return value === "active" || value === "frozen" || value === "cancelled"
-}
+export const isCardStatus = (value: unknown): value is CardStatus =>
+  typeof value === "string" && Object.hasOwn(CARD_TRANSITIONS, value)
 
 export interface IssueCardInput {
   nickname: string
@@ -43,6 +46,7 @@ export type ParseResult =
   | { ok: false; errors: FieldErrors }
 
 const asString = (value: unknown) => (typeof value === "string" ? value : "")
+const asNumber = (value: unknown) => (typeof value === "number" ? value : NaN)
 
 export function parseIssueRequest(
   body: unknown,
@@ -66,8 +70,8 @@ export function parseIssueRequest(
     errors.merchantId = "That merchant does not exist."
   }
 
-  const spendLimit = input.spendLimit
-  if (typeof spendLimit !== "number" || !Number.isInteger(spendLimit)) {
+  const spendLimit = asNumber(input.spendLimit)
+  if (!Number.isInteger(spendLimit)) {
     errors.spendLimit = "Enter a limit as a whole number of minor units."
   } else if (spendLimit <= 0) {
     errors.spendLimit = "The limit must be more than zero."
@@ -75,36 +79,26 @@ export function parseIssueRequest(
     errors.spendLimit = "The limit cannot exceed 5,000,000 minor units."
   }
 
-  const currency = input.currency
-  if (!CARD_CURRENCIES.includes(currency as Currency)) {
+  const currency = CARD_CURRENCIES.find((code) => code === input.currency)
+  if (!currency) {
     errors.currency = "Cards are issued in USD, EUR or GBP."
   } else if (merchant && currency !== merchant.currency) {
     errors.currency = `That merchant settles in ${merchant.currency}.`
   }
 
-  let category: CardCategory | null = null
-  if (input.category != null && input.category !== "") {
-    if (CARD_CATEGORIES.includes(input.category as CardCategory)) {
-      category = input.category as CardCategory
-    } else {
-      errors.category = "That category is not one we lock cards to."
-    }
+  const given = input.category
+  const category = CARD_CATEGORIES.find((entry) => entry === given) ?? null
+  if (given != null && given !== "" && !category) {
+    errors.category = "That category is not one we lock cards to."
   }
 
-  if (Object.keys(errors).length > 0) return { ok: false, errors }
+  if (Object.keys(errors).length > 0 || !currency) return { ok: false, errors }
 
   const requestId = asString(input.requestId).trim() || null
 
   return {
     ok: true,
-    value: {
-      nickname,
-      merchantId,
-      spendLimit: spendLimit as number,
-      currency: currency as Currency,
-      category,
-      requestId,
-    },
+    value: { nickname, merchantId, spendLimit, currency, category, requestId },
   }
 }
 
@@ -120,14 +114,6 @@ export const isSpendWarning = (
 ): boolean =>
   card.spendLimit > 0 &&
   card.spent * 100 > card.spendLimit * SPEND_WARN_PERCENT
-
-export const CARD_CATEGORY_LABELS: Record<CardCategory, string> = {
-  advertising: "Advertising",
-  software: "Software",
-  travel: "Travel",
-  contractors: "Contractors",
-  utilities: "Utilities",
-}
 
 export const CARD_STATUS_LABELS: Record<CardStatus, string> = {
   active: "Active",

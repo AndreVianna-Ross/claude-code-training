@@ -83,9 +83,8 @@ describe("parseIssueRequest", () => {
   })
 
   it("accepts the limit exactly at the cap", () => {
-    expect(
-      parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANTS).ok,
-    ).toBe(true)
+    const cap = { ...valid, spendLimit: MAX_SPEND_LIMIT }
+    expect(parseIssueRequest(cap, MERCHANTS).ok).toBe(true)
   })
 
   it("names the merchant's currency, and blames only the merchant when it is the unknown one", () => {
@@ -117,10 +116,8 @@ describe("parseIssueRequest", () => {
   })
 
   it("reports every bad field at once rather than the first", () => {
-    const result = parseIssueRequest(
-      { nickname: "", merchantId: "", spendLimit: -5, currency: "JPY" },
-      MERCHANTS,
-    )
+    const bad = { nickname: "", merchantId: "", spendLimit: -5, currency: "JPY" }
+    const result = parseIssueRequest(bad, MERCHANTS)
     expect(result.ok).toBe(false)
     if (!result.ok) {
       const fields = ["currency", "merchantId", "nickname", "spendLimit"]
@@ -130,9 +127,7 @@ describe("parseIssueRequest", () => {
 
   it.each([undefined, null, "nope", 7, []])(
     "survives %o as a body instead of throwing",
-    (body) => {
-      expect(parseIssueRequest(body, MERCHANTS).ok).toBe(false)
-    },
+    (body) => expect(parseIssueRequest(body, MERCHANTS).ok).toBe(false),
   )
 })
 

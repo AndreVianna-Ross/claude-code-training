@@ -7,7 +7,7 @@ import {
   TableRoot,
   TableRow,
 } from "@/components/Table"
-import { CardStatusBadge } from "@/components/ui/cards/CardStatusBadge"
+import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { listCards } from "@/data/cards"
 import { merchantById, merchants } from "@/data/merchants"
 import { maskedNumber } from "@/lib/card-number"
@@ -33,10 +33,10 @@ export default function CardsPage() {
           </p>
         </div>
         <IssueCardDialog
-          merchants={merchants.map((merchant) => ({
-            id: merchant.id,
-            name: merchant.name,
-            currency: merchant.currency,
+          merchants={merchants.map(({ id, name, currency }) => ({
+            id,
+            name,
+            currency,
           }))}
         />
       </div>
@@ -95,7 +95,7 @@ export default function CardsPage() {
                   {formatMoney(card.spendLimit, card.currency)}
                 </TableCell>
                 <TableCell>
-                  <CardStatusBadge status={card.status} />
+                  <StatusBadge status={card.status} />
                 </TableCell>
                 <TableCell>{formatDate(card.createdAt)}</TableCell>
                 <TableCell className="text-right">

@@ -15,10 +15,8 @@ export function cardById(id: string): Card | null {
 }
 
 function nextCardId(): string {
-  const highest = store.cards.reduce((max, card) => {
-    const n = Number(card.id.replace("card_", ""))
-    return Number.isFinite(n) && n > max ? n : max
-  }, 0)
+  const used = store.cards.map((card) => Number(card.id.replace("card_", "")))
+  const highest = Math.max(0, ...used.filter(Number.isFinite))
   return `card_${String(highest + 1).padStart(4, "0")}`
 }
 
@@ -27,13 +25,11 @@ export function issueCard(input: IssueCardInput): {
   number: string | null
   replayed: boolean
 } {
-  if (input.requestId) {
-    const seen = issuedRequests.get(input.requestId)
-    if (seen) {
-      const existing = cardById(seen)
-      if (existing) return { card: existing, number: null, replayed: true }
-    }
-  }
+  const seen = input.requestId
+    ? store.issuedRequests.get(input.requestId)
+    : null
+  const existing = seen ? cardById(seen) : null
+  if (existing) return { card: existing, number: null, replayed: true }
 
   const number = generateCardNumber()
 
@@ -52,11 +48,9 @@ export function issueCard(input: IssueCardInput): {
   }
 
   store.cards.push(card)
-  if (input.requestId) issuedRequests.set(input.requestId, card.id)
+  if (input.requestId) store.issuedRequests.set(input.requestId, card.id)
   return { card, number, replayed: false }
 }
-
-const issuedRequests = new Map<string, string>()
 
 export type TransitionResult =
   { ok: true; card: Card } | { ok: false; reason: "not_found" | "illegal" }

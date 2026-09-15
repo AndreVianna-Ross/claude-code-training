@@ -2,14 +2,10 @@ name: Merchant Console CI
 
 on:
   pull_request:
-    paths:
-      - "build-battle/merchant-console/**"
-      - ".github/workflows/merchant-console-ci.yml"
+    paths: ["build-battle/merchant-console/**", ".github/workflows/merchant-console-ci.yml"]
   push:
     branches-ignore: [main]
-    paths:
-      - "build-battle/merchant-console/**"
-      - ".github/workflows/merchant-console-ci.yml"
+    paths: ["build-battle/merchant-console/**", ".github/workflows/merchant-console-ci.yml"]
   workflow_dispatch:
 
 defaults:
@@ -27,9 +23,6 @@ jobs:
           cache: npm
           cache-dependency-path: build-battle/merchant-console/package-lock.json
       - run: npm ci
-      - name: Typecheck
-        run: npx tsc --noEmit
-      - name: Lint
-        run: npx next lint
-      - name: Unit tests
-        run: npm test
+      - run: npx tsc --noEmit
+      - run: npx next lint
+      - run: npm test

@@ -21,6 +21,7 @@ import {
   SelectValue,
 } from "@/components/Select"
 import { Card, Currency } from "@/data/types"
+import { maskedNumber } from "@/lib/card-number"
 import {
   CARD_CATEGORIES,
   CARD_CATEGORY_LABELS,
@@ -36,12 +37,18 @@ const NONE = "__none__"
 
 type Merchant = { id: string; name: string; currency: Currency }
 type Option = readonly [value: string, label: string]
-type Issued = { card: Card; number: string }
+type Issued = { card: Card; number: string | null }
 
 const CATEGORY_OPTIONS: readonly Option[] = [
   [NONE, "No lock"],
-  ...CARD_CATEGORIES.map((value) => [value, CARD_CATEGORY_LABELS[value]] as const),
+  ...CARD_CATEGORIES.map(
+    (value) => [value, CARD_CATEGORY_LABELS[value]] as const,
+  ),
 ]
+
+const LABEL = "text-sm font-medium text-gray-900 dark:text-gray-50"
+const ERROR_TEXT = "mt-1 text-sm text-red-600 dark:text-red-400"
+const OPTIONAL = <span className="font-normal text-gray-500">(optional)</span>
 
 function Field(props: {
   id: string
@@ -53,25 +60,27 @@ function Field(props: {
   placeholder?: string
   inputMode?: "decimal"
 }) {
-  const { id, error, options } = props
+  const { id, label, error, value, onChange, options, placeholder, inputMode } =
+    props
   return (
     <div>
-      <label
-        htmlFor={id}
-        className="text-sm font-medium text-gray-900 dark:text-gray-50"
-      >
-        {props.label}
+      <label htmlFor={id} className={LABEL}>
+        {label}
       </label>
       <div className="mt-1.5">
         {options ? (
-          <Select value={props.value} onValueChange={props.onChange}>
-            <SelectTrigger id={id}>
-              <SelectValue placeholder={props.placeholder} />
+          <Select value={value} onValueChange={onChange}>
+            <SelectTrigger
+              id={id}
+              hasError={Boolean(error)}
+              aria-describedby={error ? `${id}-error` : undefined}
+            >
+              <SelectValue placeholder={placeholder} />
             </SelectTrigger>
             <SelectContent>
-              {options.map(([value, label]) => (
-                <SelectItem key={value} value={value}>
-                  {label}
+              {options.map(([option, text]) => (
+                <SelectItem key={option} value={option}>
+                  {text}
                 </SelectItem>
               ))}
             </SelectContent>
@@ -79,17 +88,17 @@ function Field(props: {
         ) : (
           <Input
             id={id}
-            value={props.value}
-            onChange={(event) => props.onChange(event.target.value)}
-            placeholder={props.placeholder}
-            inputMode={props.inputMode}
+            value={value}
+            onChange={(event) => onChange(event.target.value)}
+            placeholder={placeholder}
+            inputMode={inputMode}
             hasError={Boolean(error)}
             aria-describedby={error ? `${id}-error` : undefined}
           />
         )}
       </div>
       {error && (
-        <p id={`${id}-error`} className="mt-1 text-sm text-red-600 dark:text-red-400">
+        <p id={`${id}-error`} className={ERROR_TEXT}>
           {error}
         </p>
       )}
@@ -141,17 +150,19 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
 
     setSaving(true)
     try {
+      const lock = category === NONE ? null : category
+      const fields = {
+        nickname,
+        merchantId,
+        spendLimit,
+        currency,
+        category: lock,
+        requestId,
+      }
       const response = await fetch("/api/cards", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          nickname,
-          merchantId,
-          spendLimit,
-          currency,
-          category: category === NONE ? null : category,
-          requestId,
-        }),
+        body: JSON.stringify(fields),
       })
       const payload = await response.json()
 
@@ -185,9 +196,11 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
             {issued ? "Card issued" : "Issue a virtual card"}
           </DrawerTitle>
           <DrawerDescription>
-            {issued
-              ? "This is the only time the full number is shown. Copy it now — afterwards only the last four is kept."
-              : "Single merchant, with a limit from the moment it exists."}
+            {!issued
+              ? "Single merchant, with a limit from the moment it exists."
+              : issued.number
+                ? "This is the only time the full number is shown. Copy it now — afterwards only the last four is kept."
+                : "An earlier attempt already issued this card. Its number was shown then and is not recoverable."}
           </DrawerDescription>
         </DrawerHeader>
 
@@ -199,7 +212,9 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                   Card number
                 </p>
                 <p className="mt-1 font-mono text-lg tabular-nums text-gray-900 dark:text-gray-50">
-                  {issued.number.replace(/(.{4})/g, "$1 ").trim()}
+                  {issued.number
+                    ? issued.number.replace(/(.{4})/g, "$1 ").trim()
+                    : maskedNumber(issued.card.last4)}
                 </p>
               </div>
               <p className="text-sm text-gray-500">
@@ -277,12 +292,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
 
               <Field
                 id="card-category"
-                label={
-                  <>
-                    Category lock{" "}
-                    <span className="font-normal text-gray-500">(optional)</span>
-                  </>
-                }
+                label={<>Category lock {OPTIONAL}</>}
                 error={errors.category}
                 value={category}
                 onChange={setCategory}
