@@ -15,6 +15,12 @@ import { cx } from "@/lib/utils"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+const BAR_WIDTHS = [
+  "w-0", "w-[5%]", "w-[10%]", "w-[15%]", "w-[20%]", "w-[25%]", "w-[30%]",
+  "w-[35%]", "w-[40%]", "w-[45%]", "w-[50%]", "w-[55%]", "w-[60%]", "w-[65%]",
+  "w-[70%]", "w-[75%]", "w-[80%]", "w-[85%]", "w-[90%]", "w-[95%]", "w-full",
+] as const
+
 export default async function CardDetail({
   params,
 }: {
@@ -81,8 +87,8 @@ export default async function CardDetail({
             className={cx(
               "h-full rounded-full transition-all",
               warning ? "bg-amber-500" : "bg-blue-500",
+              BAR_WIDTHS[Math.round(percent / 5)],
             )}
-            style={{ width: `${percent}%` }}
           />
         </div>
 

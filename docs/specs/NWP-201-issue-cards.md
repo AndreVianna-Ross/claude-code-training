@@ -67,7 +67,7 @@ The full number exists only as the return value of `issueCard` and the body of t
 4. **Cancelling is server-side only.** The transition is implemented and tested, but no UI control ships: it is irreversible and deserves a confirmation design this ticket did not ask for.
 5. **No filtering, sorting or pagination** on `/cards`. Twelve to twenty cards a week does not need it, and a second filter path would break ORG-6 for no benefit.
 6. **Row actions name their card** in an `aria-label`: across twenty rows "Freeze" alone does not say which, and the row supplies that context visually and nowhere else.
-7. **The spend bar's width is an inline `style`**, which `components.md:10` otherwise forbids. A computed percentage is the one thing the Tailwind JIT cannot see, and there is no `ProgressBar` primitive; the repo's own `Drawer.tsx:59` and `BarChart.tsx:399` do the same.
+7. **The spend bar's width comes from a literal Tailwind class, not an inline `style`.** `components.md:10` forbids inline styles, and a computed percentage is the one thing the JIT cannot see — so the bar picks from a 21-entry table of literal `w-[n%]` classes at 5% steps. The bar is therefore accurate to 5%; the exact figure stays in the caption and in `aria-valuenow`, which is what a screen reader reads anyway.
 
 ## Plan
 
