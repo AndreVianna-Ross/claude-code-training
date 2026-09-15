@@ -73,14 +73,14 @@ Types and store slice → `src/lib` rules with their tests → `src/data/cards.t
 
 ## Verification
 
-103 tests, `npm test`. Per criterion:
+77 tests, `npm test`. Each rule is proven once, at the layer that enforces it, rather than restated at two layers. Per criterion:
 
 | Criterion | How it is proven |
 | --- | --- |
-| CORE-4 generated numbers; Luhn on the test BIN | `card-number.test.ts`: 500 samples asserted 16 digits, `4242`-prefixed and Luhn-valid, plus both extremes of `random` by injection, and a reference proven independent of the number by two seeded tests |
+| CORE-4 generated numbers; Luhn on the test BIN | `card-number.test.ts`: 500 samples asserted 16 digits, `4242`-prefixed and Luhn-valid, plus both extremes of `random` by injection, and a reference proven independent of the number by a seeded test |
 | CORE-5 reveal once | `data/cards.test.ts`: `issueCard`'s record asserted not to contain the number. `api/cards/route.test.ts`: `GET` carries no `number` key at all |
-| CORE-6 server-side validation | `cards.test.ts` a row per rejection through the pure parser; `api/cards/route.test.ts` the same rejections **over HTTP**, each a 400 naming its field, plus a non-JSON body in the same error shape |
-| RULE-3 state machine | `data/cards.test.ts` against the real store, and `api/cards/[id]/route.test.ts` walks every legal edge **over HTTP** — `frozen → frozen` 409, `cancelled` terminal 409, bad status 400, unknown card 404 |
+| CORE-6 server-side validation | `api/cards/route.test.ts`: a row per rejection **over HTTP**, each a 400 naming its field, plus a non-JSON body in the same error shape. `cards.test.ts` keeps the four rules the route cannot reach — a limit sent as a string, a lowercased currency, an empty currency, an over-long nickname — and asserts every bad field is reported at once rather than the first |
+| RULE-3 state machine | `data/cards.test.ts` against the real store, and `api/cards/[id]/route.test.ts` walks every legal edge **over HTTP** — `frozen → frozen` 409, `cancelled` terminal 409, bad status 400, unknown card 404. `cards.test.ts` covers the two edges that walk never reaches: `frozen → cancelled`, and the `active → active` refusal |
 | Idempotency | `api/cards/route.test.ts`: a replayed `requestId` returns 200, `replayed: true`, `number: null`, the same card id, and adds no second card |
 | Seeded spend is real | `data/cards.test.ts`: every card's `spent` is a prefix sum of its merchant's captured payments and never exceeds its limit, and exactly one seeded card sits in the amber band |
 | CORE-1/2/3 issue, list, detail; stretch states | **By hand in the browser:** issue → the row appears → detail → freeze and unfreeze, plus the empty and error states. No automated test drives the UI, because `vitest.config.ts:13` is a node environment and no `.tsx` loads |

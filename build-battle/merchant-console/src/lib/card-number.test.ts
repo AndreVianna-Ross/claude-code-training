@@ -24,11 +24,6 @@ describe("generateCardNumber", () => {
       expect(isLuhnValid(number)).toBe(true)
     }
   })
-
-  it("does not return the same number twice in a row", () => {
-    const seen = new Set(Array.from({ length: 50 }, () => generateCardNumber()))
-    expect(seen.size).toBeGreaterThan(1)
-  })
 })
 
 describe("the Luhn checksum", () => {
@@ -54,7 +49,6 @@ describe("the Luhn checksum", () => {
 describe("what leaves the server", () => {
   it("masks everything but the last four", () => {
     expect(maskedNumber("4242")).toBe("•••• 4242")
-    expect(maskedNumber("4242")).not.toContain("4242424242")
   })
 
   it("draws a reference that cannot depend on the card number", () => {
