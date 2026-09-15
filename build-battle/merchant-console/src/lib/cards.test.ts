@@ -1,25 +1,10 @@
 import { describe, expect, it } from "vitest"
-import {
-  CARD_TRANSITIONS,
-  type FieldErrors,
-  MAX_SPEND_LIMIT,
-  canTransition,
-  isSpendWarning,
-  parseIssueRequest,
-  spendPercent,
-} from "./cards"
+import { CARD_TRANSITIONS, type FieldErrors, MAX_SPEND_LIMIT, canTransition,
+  isSpendWarning, parseIssueRequest, spendPercent } from "./cards"
 
-const MERCHANTS = [
-  { id: "mch_01", currency: "USD" },
-  { id: "mch_02", currency: "EUR" },
-] as const
+const MERCHANTS = [{ id: "mch_01", currency: "USD" }, { id: "mch_02", currency: "EUR" }] as const
 
-const valid = {
-  nickname: "Ad spend",
-  merchantId: "mch_01",
-  spendLimit: 25000,
-  currency: "USD",
-}
+const valid = { nickname: "Ad spend", merchantId: "mch_01", spendLimit: 25000, currency: "USD" }
 
 describe("the card state machine", () => {
   it("lets a card freeze, come back, and be cancelled from either side", () => {
@@ -46,11 +31,8 @@ describe("parseIssueRequest", () => {
   it("accepts a well-formed request", () => {
     const result = parseIssueRequest(valid, MERCHANTS)
     expect(result.ok).toBe(true)
-    if (result.ok) {
-      expect(result.value.spendLimit).toBe(25000)
-      expect(result.value.category).toBeNull()
-      expect(result.value.requestId).toBeNull()
-    }
+    if (result.ok)
+      expect(result.value).toMatchObject({ spendLimit: 25000, category: null, requestId: null })
   })
 
   const rejections: [string, object, keyof FieldErrors][] = [
@@ -83,8 +65,7 @@ describe("parseIssueRequest", () => {
   })
 
   it("accepts the limit exactly at the cap", () => {
-    const cap = { ...valid, spendLimit: MAX_SPEND_LIMIT }
-    expect(parseIssueRequest(cap, MERCHANTS).ok).toBe(true)
+    expect(parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANTS).ok).toBe(true)
   })
 
   it("names the merchant's currency, and blames only the merchant when it is the unknown one", () => {
@@ -100,8 +81,7 @@ describe("parseIssueRequest", () => {
 
   it("takes a known category", () => {
     const result = parseIssueRequest({ ...valid, category: "software" }, MERCHANTS)
-    expect(result.ok).toBe(true)
-    if (result.ok) expect(result.value.category).toBe("software")
+    expect(result.ok && result.value.category).toBe("software")
   })
 
   it("carries an idempotency key through, and normalises its absence", () => {
@@ -119,10 +99,8 @@ describe("parseIssueRequest", () => {
     const bad = { nickname: "", merchantId: "", spendLimit: -5, currency: "JPY" }
     const result = parseIssueRequest(bad, MERCHANTS)
     expect(result.ok).toBe(false)
-    if (!result.ok) {
-      const fields = ["currency", "merchantId", "nickname", "spendLimit"]
-      expect(Object.keys(result.errors).sort()).toEqual(fields)
-    }
+    if (!result.ok)
+      expect(Object.keys(result.errors).sort()).toEqual(["currency", "merchantId", "nickname", "spendLimit"])
   })
 
   it.each([undefined, null, "nope", 7, []])(

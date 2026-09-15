@@ -3,12 +3,8 @@ import { cardById, issueCard, listCards, transitionCard } from "./cards"
 import { store } from "./store"
 
 const request = {
-  nickname: "Ad spend",
-  merchantId: "mch_01",
-  spendLimit: 25_000,
-  currency: "USD" as const,
-  category: null,
-  requestId: null,
+  nickname: "Ad spend", merchantId: "mch_01", spendLimit: 25_000,
+  currency: "USD" as const, category: null, requestId: null,
 }
 
 describe("issueCard", () => {

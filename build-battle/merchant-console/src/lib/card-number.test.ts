@@ -1,12 +1,6 @@
 import { describe, expect, it } from "vitest"
-import {
-  TEST_BIN,
-  cardReference,
-  generateCardNumber,
-  isLuhnValid,
-  luhnCheckDigit,
-  maskedNumber,
-} from "./card-number"
+import { TEST_BIN, cardReference, generateCardNumber, isLuhnValid, luhnCheckDigit,
+  maskedNumber } from "./card-number"
 
 const seeded = (seed: number) => () => {
   seed = (seed * 1103515245 + 12345) % 2147483648
