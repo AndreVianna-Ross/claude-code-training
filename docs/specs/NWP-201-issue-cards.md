@@ -73,6 +73,8 @@ The full number exists only as the return value of `issueCard` and the body of t
 3. **`frozen → frozen` is refused with 409**, not accepted as a no-op, so a double click is reported rather than looking like it worked twice.
 4. **Cancel is in the UI behind a confirm step**, because it is terminal.
 5. **No filtering, sorting or pagination** on `/cards`. Twelve to twenty cards a week does not need it, and a second filter path would break ORG-6 for no benefit.
+6. **Row actions name their card.** `Freeze` alone does not say which card when there are twenty rows — the row supplies that context visually and nowhere else — so each button carries an `aria-label` naming it, and the cancel confirm is a `role="group"` with an accessible name and a `role="alert"` prompt.
+7. **The spend bar's width is an inline `style`**, which `.claude/rules/components.md:10` otherwise forbids. A computed percentage is the one thing the Tailwind JIT cannot express, since it only sees literal class strings, and there is no `ProgressBar` primitive in `src/components/`. The repo's own components do the same for derived values (`Drawer.tsx:59`, `BarChart.tsx:399`). Recorded here so it reads as a decision rather than an oversight.
 
 ## Plan
 
