@@ -82,13 +82,18 @@ export interface Card {
   id: string
   nickname: string
   merchantId: string
+  /** Integer minor units. Never a float. */
   spendLimit: number
+  /** Integer minor units, spent to date against the limit. */
   spent: number
   currency: Currency
+  /** The only part of the number that is kept. */
   last4: string
+  /** Opaque handle for the generated number. Not the number itself. */
   reference: string
   category: CardCategory | null
   status: CardStatus
+  /** ISO 8601, always UTC. */
   createdAt: string
 }
 
