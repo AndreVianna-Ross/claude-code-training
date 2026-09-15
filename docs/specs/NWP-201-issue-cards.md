@@ -13,9 +13,8 @@ No card code existed: no `Card`, no `CardStatus`, no `cards` slice, no `/cards` 
 - `src/lib/money.ts:15` `formatMoney(minorUnits, currency)`, the one formatter; `:46` `parseAmountToMinorUnits` converts a typed `"250.00"` and returns `null` otherwise — the boundary parser the form needs, already written.
 - `src/lib/dates.ts:22` `formatInZone(iso, timezone)`; `:31` `formatDate`. Display converts; storage does not.
 - `src/data/store.ts:16` the `Store` interface, held on `globalThis` (`:34`) so reloads keep writes. **A new slice needs a server restart, not a hot reload.**
-- `src/data/merchants.ts:7` ten merchants, each with exactly one currency and **no category field** — so the category lock belongs on the card, and the card-currency rule below is decidable.
-- `src/components/ui/payments/StatusBadge.tsx:5` the badge idiom: `LABELS`/`DOTS`/`VARIANTS` keyed by a status union.
-- `src/app/payments/[id]/page.tsx` the detail-page idiom: back link, `notFound()`, `<h1>`, `Divider`, `<dl>`.
+- `src/data/merchants.ts:7` ten merchants, each with exactly one currency and **no category field** — so the category lock belongs on the card, and the card-currency rule is decidable.
+- `src/components/ui/payments/StatusBadge.tsx:5` the badge idiom: `LABELS`/`DOTS`/`VARIANTS` keyed by a status union. `src/app/payments/[id]/page.tsx` the detail-page idiom: back link, `notFound()`, `<h1>`, `Divider`, `<dl>`.
 - `src/components/` has `Drawer` (the only `@radix-ui/react-dialog` wrapper), `Button`, `Input`, `Select`, `Badge`, `Table`. **No Dialog**, despite `.claude/rules/components.md:9` claiming one; no progress bar.
 - `vitest.config.ts:13` node environment over `src/**/*.test.ts`. Pure modules test; `.tsx` does not load.
 
@@ -36,9 +35,9 @@ No card code existed: no `Card`, no `CardStatus`, no `cards` slice, no `/cards` 
 
 Cards are a new entity, so they get their own modules rather than being wedged into the payments builder: `src/lib/card-number.ts` for PAN generation and masking, `src/lib/cards.ts` for the remaining pure rules, `src/data/cards.ts` for store access. `src/data/queries.ts` stays the one *payment* query builder, which is what ORG-6 protects.
 
-The full number exists only as the return value of `issueCard` and the body of the creation response. The `Card` record has **no field for it**, so masking everywhere else follows from the type rather than from discipline. Validation is a pure parse returning a value or per-field errors, so the route is a thin shell and every rule is testable without HTTP.
+The full number exists only as the return value of `issueCard` and the body of the creation response. The `Card` record has **no field for it**, so masking follows from the type rather than from discipline. Validation is a pure parse returning a value or per-field errors, so the route is a thin shell and every rule is testable without HTTP.
 
-**Rejected:** storing the number and filtering it out of responses — one stray spread and the PAN is out; a record with nowhere to put it cannot leak it. **Rejected:** deriving `reference` from the number — with the known `4242` BIN and the stored last four, even a slice narrows the PAN to a handful of Luhn-valid candidates, so it is drawn independently. Its alphabet is not digit-free (it carries `2-9`, minus the confusable `0`, `1`, `i`, `l`, `o`), and that is fine: the property that matters is independence, not the absence of digits. **Rejected:** the category on `Merchant` — the ticket calls it a card lock, and adding a field would edit protected seed data.
+**Rejected:** storing the number and filtering it out of responses — one stray spread and the PAN is out. **Rejected:** deriving `reference` from the number — with the known `4242` BIN and the stored last four, even a slice narrows the PAN to a handful of Luhn-valid candidates, so it is drawn independently; its alphabet carries `2-9` minus the confusable `0`, `1`, `i`, `l`, `o`, and that is fine because the property that matters is independence, not the absence of digits. **Rejected:** the category on `Merchant` — the ticket calls it a card lock, and adding a field would edit protected seed data.
 
 ## File map
 
@@ -89,8 +88,7 @@ Types and store slice → `src/lib` rules with their tests → `src/data/cards.t
 ## Risks
 
 - **The store lives on `globalThis`.** Adding a slice while the server runs leaves the old shape cached and yields a 500 — restart, do not hot-reload. This cost real time once.
-- **`crypto.randomUUID` needs a secure context.** Fine on localhost and HTTPS.
-- Seeds are pinned to `GENERATED_AT`, so the amber case is reproducible; wall-clock time made them drift between runs.
+- **`crypto.randomUUID` needs a secure context** (fine on localhost and HTTPS). Seeds are pinned to `GENERATED_AT` so the amber case is reproducible; wall-clock time made them drift between runs.
 
 ## Out of scope
 
