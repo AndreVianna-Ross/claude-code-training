@@ -47,10 +47,18 @@ export function CardActions({ card }: { card: Card }) {
     }
   }
 
+  // Every label names its card: in a table of rows, "Freeze" alone does not
+  // say which one, and the row is the only thing giving it context visually.
   if (confirming) {
     return (
-      <div className="flex items-center justify-end gap-2">
-        <span className="text-sm text-gray-500">Cancel for good?</span>
+      <div
+        role="group"
+        aria-label={`Cancel ${card.nickname}`}
+        className="flex items-center justify-end gap-2"
+      >
+        <span role="alert" className="text-sm text-gray-500">
+          Cancel for good?
+        </span>
         <Button
           variant="secondary"
           className="py-1"
@@ -84,6 +92,7 @@ export function CardActions({ card }: { card: Card }) {
         variant="secondary"
         className="py-1"
         disabled={busy}
+        aria-label={`${frozen ? "Unfreeze" : "Freeze"} ${card.nickname}`}
         onClick={() => move(frozen ? "active" : "frozen")}
       >
         {frozen ? "Unfreeze" : "Freeze"}
@@ -92,6 +101,7 @@ export function CardActions({ card }: { card: Card }) {
         variant="ghost"
         className="py-1 text-red-600 hover:text-red-700 dark:text-red-400"
         disabled={busy}
+        aria-label={`Cancel ${card.nickname}`}
         onClick={() => setConfirming(true)}
       >
         Cancel

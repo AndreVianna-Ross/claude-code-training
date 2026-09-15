@@ -110,6 +110,9 @@ export default async function CardDetail({
               "h-full rounded-full transition-all",
               warning ? "bg-amber-500" : "bg-blue-500",
             )}
+            // A computed width is the one thing Tailwind cannot express: the
+            // JIT only sees literal class strings. The repo's own components
+            // do the same for derived values (Drawer.tsx:59, BarChart.tsx:399).
             style={{ width: `${percent}%` }}
           />
         </div>
