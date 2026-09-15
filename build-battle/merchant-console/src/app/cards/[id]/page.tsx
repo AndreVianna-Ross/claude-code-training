@@ -3,12 +3,7 @@ import { StatusBadge } from "@/components/ui/payments/StatusBadge"
 import { cardById } from "@/data/cards"
 import { merchantById } from "@/data/merchants"
 import { maskedNumber } from "@/lib/card-number"
-import {
-  CARD_CATEGORY_LABELS,
-  CARD_STATUS_LABELS,
-  isSpendWarning,
-  spendPercent,
-} from "@/lib/cards"
+import { CARD_CATEGORY_LABELS, CARD_STATUS_LABELS, isSpendWarning, spendPercent } from "@/lib/cards"
 import { formatInZone } from "@/lib/dates"
 import { formatMoney } from "@/lib/money"
 import { cx } from "@/lib/utils"
@@ -20,34 +15,12 @@ const CHIP =
 const DD = "text-sm text-gray-900 dark:text-gray-50"
 
 const BAR_WIDTHS = [
-  "w-0",
-  "w-[5%]",
-  "w-[10%]",
-  "w-[15%]",
-  "w-[20%]",
-  "w-[25%]",
-  "w-[30%]",
-  "w-[35%]",
-  "w-[40%]",
-  "w-[45%]",
-  "w-[50%]",
-  "w-[55%]",
-  "w-[60%]",
-  "w-[65%]",
-  "w-[70%]",
-  "w-[75%]",
-  "w-[80%]",
-  "w-[85%]",
-  "w-[90%]",
-  "w-[95%]",
-  "w-full",
+  "w-0", "w-[5%]", "w-[10%]", "w-[15%]", "w-[20%]", "w-[25%]", "w-[30%]",
+  "w-[35%]", "w-[40%]", "w-[45%]", "w-[50%]", "w-[55%]", "w-[60%]", "w-[65%]",
+  "w-[70%]", "w-[75%]", "w-[80%]", "w-[85%]", "w-[90%]", "w-[95%]", "w-full",
 ] as const
 
-export default async function CardDetail({
-  params,
-}: {
-  params: Promise<{ id: string }>
-}) {
+export default async function CardDetail({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params
   const card = cardById(id)
   if (!card) notFound()
@@ -86,11 +59,7 @@ export default async function CardDetail({
           {card.nickname}
         </h1>
         <StatusBadge status={card.status} />
-        {card.category && (
-          <span className={CHIP}>
-            {CARD_CATEGORY_LABELS[card.category]} only
-          </span>
-        )}
+        {card.category && <span className={CHIP}>{CARD_CATEGORY_LABELS[card.category]} only</span>}
       </div>
       <p className="mt-1 font-mono text-sm text-gray-500">
         {maskedNumber(card.last4)} · {card.id}
@@ -100,10 +69,7 @@ export default async function CardDetail({
 
       <section aria-labelledby="spend-heading">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2
-            id="spend-heading"
-            className="text-sm font-semibold text-gray-900 dark:text-gray-50"
-          >
+          <h2 id="spend-heading" className="text-sm font-semibold text-gray-900 dark:text-gray-50">
             Spend against limit
           </h2>
           <p className="text-sm tabular-nums text-gray-500">
@@ -140,12 +106,7 @@ export default async function CardDetail({
         {rows.map(([label, value, mono]) => (
           <div key={label}>
             <dt className="text-sm text-gray-500">{label}</dt>
-            <dd
-              className={cx(
-                DD,
-                mono ? "font-mono" : "font-medium tabular-nums",
-              )}
-            >
+            <dd className={cx(DD, mono ? "font-mono" : "font-medium tabular-nums")}>
               {value}
             </dd>
           </div>

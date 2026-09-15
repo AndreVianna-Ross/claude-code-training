@@ -10,9 +10,8 @@ export function CardActions({ card }: { card: Card }) {
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  if (card.status === "cancelled") {
+  if (card.status === "cancelled")
     return <span className="text-sm text-gray-400">—</span>
-  }
 
   const move = async (status: CardStatus) => {
     setBusy(true)

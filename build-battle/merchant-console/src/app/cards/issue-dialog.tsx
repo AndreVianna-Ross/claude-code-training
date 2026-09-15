@@ -1,33 +1,13 @@
 "use client"
 
 import { Button } from "@/components/Button"
-import {
-  Drawer,
-  DrawerBody,
-  DrawerClose,
-  DrawerContent,
-  DrawerDescription,
-  DrawerFooter,
-  DrawerHeader,
-  DrawerTitle,
-  DrawerTrigger,
-} from "@/components/Drawer"
+import { Drawer, DrawerBody, DrawerClose, DrawerContent, DrawerDescription,
+  DrawerFooter, DrawerHeader, DrawerTitle, DrawerTrigger } from "@/components/Drawer"
 import { Input } from "@/components/Input"
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/Select"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/Select"
 import { Card, Currency } from "@/data/types"
 import { maskedNumber } from "@/lib/card-number"
-import {
-  CARD_CATEGORIES,
-  CARD_CATEGORY_LABELS,
-  CARD_CURRENCIES,
-  type FieldErrors,
-} from "@/lib/cards"
+import { CARD_CATEGORIES, CARD_CATEGORY_LABELS, CARD_CURRENCIES, type FieldErrors } from "@/lib/cards"
 import { formatMoney, parseAmountToMinorUnits } from "@/lib/money"
 import { Plus } from "lucide-react"
 import { useRouter } from "next/navigation"
@@ -41,13 +21,13 @@ type Issued = { card: Card; number: string | null }
 
 const CATEGORY_OPTIONS: readonly Option[] = [
   [NONE, "No lock"],
-  ...CARD_CATEGORIES.map(
-    (value) => [value, CARD_CATEGORY_LABELS[value]] as const,
-  ),
+  ...CARD_CATEGORIES.map((value) => [value, CARD_CATEGORY_LABELS[value]] as const),
 ]
 
 const LABEL = "text-sm font-medium text-gray-900 dark:text-gray-50"
 const ERROR_TEXT = "mt-1 text-sm text-red-600 dark:text-red-400"
+const ALERT =
+  "rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400"
 const OPTIONAL = <span className="font-normal text-gray-500">(optional)</span>
 
 function Field(props: {
@@ -60,13 +40,10 @@ function Field(props: {
   placeholder?: string
   inputMode?: "decimal"
 }) {
-  const { id, label, error, value, onChange, options, placeholder, inputMode } =
-    props
+  const { id, label, error, value, onChange, options, placeholder, inputMode } = props
   return (
     <div>
-      <label htmlFor={id} className={LABEL}>
-        {label}
-      </label>
+      <label htmlFor={id} className={LABEL}>{label}</label>
       <div className="mt-1.5">
         {options ? (
           <Select value={value} onValueChange={onChange}>
@@ -79,9 +56,7 @@ function Field(props: {
             </SelectTrigger>
             <SelectContent>
               {options.map(([option, text]) => (
-                <SelectItem key={option} value={option}>
-                  {text}
-                </SelectItem>
+                <SelectItem key={option} value={option}>{text}</SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -97,11 +72,7 @@ function Field(props: {
           />
         )}
       </div>
-      {error && (
-        <p id={`${id}-error`} className={ERROR_TEXT}>
-          {error}
-        </p>
-      )}
+      {error && <p id={`${id}-error`} className={ERROR_TEXT}>{error}</p>}
     </div>
   )
 }
@@ -192,9 +163,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
 
       <DrawerContent className="sm:max-w-lg">
         <DrawerHeader>
-          <DrawerTitle>
-            {issued ? "Card issued" : "Issue a virtual card"}
-          </DrawerTitle>
+          <DrawerTitle>{issued ? "Card issued" : "Issue a virtual card"}</DrawerTitle>
           <DrawerDescription>
             {!issued
               ? "Single merchant, with a limit from the moment it exists."
@@ -208,9 +177,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
           <>
             <DrawerBody className="space-y-4">
               <div className="rounded-md border border-gray-200 bg-gray-50 p-4 dark:border-gray-800 dark:bg-gray-900">
-                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                  Card number
-                </p>
+                <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Card number</p>
                 <p className="mt-1 font-mono text-lg tabular-nums text-gray-900 dark:text-gray-50">
                   {issued.number
                     ? issued.number.replace(/(.{4})/g, "$1 ").trim()
@@ -233,12 +200,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
           <>
             <DrawerBody className="space-y-4">
               {formError && (
-                <p
-                  role="alert"
-                  className="rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950 dark:text-red-400"
-                >
-                  {formError}
-                </p>
+                <p role="alert" className={ALERT}>{formError}</p>
               )}
 
               <Field
@@ -302,9 +264,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
 
             <DrawerFooter className="gap-2 sm:flex-row sm:justify-end">
               <DrawerClose asChild>
-                <Button variant="secondary" className="py-1.5">
-                  Cancel
-                </Button>
+                <Button variant="secondary" className="py-1.5">Cancel</Button>
               </DrawerClose>
               <Button
                 className="py-1.5"
