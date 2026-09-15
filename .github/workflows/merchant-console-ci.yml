@@ -9,6 +9,8 @@ on:
     branches-ignore: [main]
     paths:
       - "build-battle/merchant-console/**"
+      - ".github/workflows/merchant-console-ci.yml"
+  workflow_dispatch:
 
 defaults:
   run:
