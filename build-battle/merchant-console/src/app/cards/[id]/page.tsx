@@ -2,11 +2,11 @@ import { Divider } from "@/components/Divider"
 import { CardStatusBadge } from "@/components/ui/cards/CardStatusBadge"
 import { cardById } from "@/data/cards"
 import { merchantById } from "@/data/merchants"
+import { maskedNumber } from "@/lib/card-number"
 import {
   CARD_CATEGORY_LABELS,
   CARD_STATUS_LABELS,
   isSpendWarning,
-  maskedNumber,
   spendPercent,
 } from "@/lib/cards"
 import { formatInZone } from "@/lib/dates"
@@ -146,42 +146,6 @@ export default async function CardDetail({
           {formatInZone(card.createdAt, zone)}
         </Row>
       </dl>
-
-      <Divider />
-
-      <section aria-labelledby="history-heading">
-        <h2
-          id="history-heading"
-          className="text-sm font-semibold text-gray-900 dark:text-gray-50"
-        >
-          History
-        </h2>
-        <p className="mt-1 text-sm text-gray-500">
-          Every status this card has held, in {zone}.
-        </p>
-        <ol className="mt-3 space-y-2">
-          {card.history.map((event, index) => (
-            <li
-              key={`${event.at}-${index}`}
-              className="flex flex-wrap items-baseline gap-x-3 text-sm"
-            >
-              <span className="w-56 shrink-0 tabular-nums text-gray-500">
-                {formatInZone(event.at, zone)}
-              </span>
-              <span className="font-medium text-gray-900 dark:text-gray-50">
-                {event.action === "issued"
-                  ? "Issued"
-                  : CARD_STATUS_LABELS[event.action]}
-              </span>
-              {event.from && (
-                <span className="text-gray-500">
-                  from {CARD_STATUS_LABELS[event.from]}
-                </span>
-              )}
-            </li>
-          ))}
-        </ol>
-      </section>
 
       <p className="mt-6 text-sm text-gray-500">
         The full number was shown once, when this card was issued. Only the last

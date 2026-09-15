@@ -45,7 +45,7 @@ const NONE = "__none__"
 
 type Merchant = { id: string; name: string; currency: Currency }
 
-/** One labelled control with its error. Five of these, so it is worth a name. */
+/** A labelled control with its error. Four of these, so it is worth a name. */
 function Field({
   id,
   label,
@@ -70,14 +70,41 @@ function Field({
       </label>
       <div className="mt-1.5">{children}</div>
       {error && (
-        <p
-          id={`${id}-error`}
-          className="mt-1 text-sm text-red-600 dark:text-red-400"
-        >
+        <p id={`${id}-error`} className="mt-1 text-sm text-red-600 dark:text-red-400">
           {error}
         </p>
       )}
     </div>
+  )
+}
+
+/** A Select over [value, label] pairs. Three of these in this form. */
+function Choice({
+  id,
+  value,
+  onChange,
+  options,
+  placeholder,
+}: {
+  id: string
+  value: string
+  onChange: (value: string) => void
+  options: readonly (readonly [string, string])[]
+  placeholder?: string
+}) {
+  return (
+    <Select value={value} onValueChange={onChange}>
+      <SelectTrigger id={id}>
+        <SelectValue placeholder={placeholder} />
+      </SelectTrigger>
+      <SelectContent>
+        {options.map(([optionValue, optionLabel]) => (
+          <SelectItem key={optionValue} value={optionValue}>
+            {optionLabel}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
   )
 }
 
@@ -98,13 +125,13 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
     null,
   )
   // Held across retries so a resubmitted form cannot mint a second card. A new
-  // key is drawn only once a card has actually been issued.
+  // key is drawn only once the drawer closes.
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
 
   const selected = merchants.find((entry) => entry.id === merchantId) ?? null
   // A card settles where its merchant settles, and the server enforces it, so
   // the control offers only what would be accepted rather than inviting a 400.
-  const choices = selected ? [selected.currency] : CARD_CURRENCIES
+  const currencies = selected ? [selected.currency] : CARD_CURRENCIES
 
   const reset = () => {
     setNickname("")
@@ -150,7 +177,6 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
           requestId,
         }),
       })
-
       const payload = await response.json()
 
       if (!response.ok) {
@@ -197,22 +223,11 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                   {issued.number.replace(/(.{4})/g, "$1 ").trim()}
                 </p>
               </div>
-
-              <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
-                <div>
-                  <dt className="text-gray-500">Nickname</dt>
-                  <dd className="text-gray-900 dark:text-gray-50">
-                    {issued.card.nickname}
-                  </dd>
-                </div>
-                <div>
-                  <dt className="text-gray-500">Spend limit</dt>
-                  <dd className="tabular-nums text-gray-900 dark:text-gray-50">
-                    {formatMoney(issued.card.spendLimit, issued.card.currency)}{" "}
-                    {issued.card.currency}
-                  </dd>
-                </div>
-              </dl>
+              <p className="text-sm text-gray-500">
+                {issued.card.nickname} ·{" "}
+                {formatMoney(issued.card.spendLimit, issued.card.currency)}{" "}
+                {issued.card.currency} limit
+              </p>
             </DrawerBody>
 
             <DrawerFooter>
@@ -240,11 +255,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                 </p>
               )}
 
-              <Field
-                id="card-nickname"
-                label="Nickname"
-                error={errors.nickname}
-              >
+              <Field id="card-nickname" label="Nickname" error={errors.nickname}>
                 <Input
                   id="card-nickname"
                   value={nickname}
@@ -257,39 +268,22 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                 />
               </Field>
 
-              <Field
-                id="card-merchant"
-                label="Merchant"
-                error={errors.merchantId}
-              >
-                <Select
+              <Field id="card-merchant" label="Merchant" error={errors.merchantId}>
+                <Choice
+                  id="card-merchant"
                   value={merchantId}
-                  onValueChange={(value) => {
+                  placeholder="Choose a merchant"
+                  options={merchants.map((m) => [m.id, m.name] as const)}
+                  onChange={(value) => {
                     setMerchantId(value)
-                    // A card settles how its merchant settles.
                     const merchant = merchants.find((m) => m.id === value)
                     if (merchant) setCurrency(merchant.currency)
                   }}
-                >
-                  <SelectTrigger id="card-merchant">
-                    <SelectValue placeholder="Choose a merchant" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {merchants.map((merchant) => (
-                      <SelectItem key={merchant.id} value={merchant.id}>
-                        {merchant.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                />
               </Field>
 
               <div className="grid grid-cols-[1fr_7rem] gap-3">
-                <Field
-                  id="card-limit"
-                  label="Spend limit"
-                  error={errors.spendLimit}
-                >
+                <Field id="card-limit" label="Spend limit" error={errors.spendLimit}>
                   <Input
                     id="card-limit"
                     inputMode="decimal"
@@ -302,26 +296,13 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                     }
                   />
                 </Field>
-                <Field
-                  id="card-currency"
-                  label="Currency"
-                  error={errors.currency}
-                >
-                  <Select
+                <Field id="card-currency" label="Currency" error={errors.currency}>
+                  <Choice
+                    id="card-currency"
                     value={currency}
-                    onValueChange={(value) => setCurrency(value as Currency)}
-                  >
-                    <SelectTrigger id="card-currency">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {choices.map((code) => (
-                        <SelectItem key={code} value={code}>
-                          {code}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                    options={currencies.map((code) => [code, code] as const)}
+                    onChange={(value) => setCurrency(value as Currency)}
+                  />
                 </Field>
               </div>
               {selected && (
@@ -337,19 +318,17 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                 hint="(optional)"
                 error={errors.category}
               >
-                <Select value={category} onValueChange={setCategory}>
-                  <SelectTrigger id="card-category">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value={NONE}>No lock</SelectItem>
-                    {CARD_CATEGORIES.map((value) => (
-                      <SelectItem key={value} value={value}>
-                        {CARD_CATEGORY_LABELS[value]}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Choice
+                  id="card-category"
+                  value={category}
+                  onChange={setCategory}
+                  options={[
+                    [NONE, "No lock"] as const,
+                    ...CARD_CATEGORIES.map(
+                      (value) => [value, CARD_CATEGORY_LABELS[value]] as const,
+                    ),
+                  ]}
+                />
               </Field>
             </DrawerBody>
 

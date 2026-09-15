@@ -6,18 +6,16 @@ import { useRouter } from "next/navigation"
 import { useState } from "react"
 
 /**
- * Freeze, unfreeze and cancel from the list, without a full page reload:
+ * Freeze and unfreeze from the list, without a full page reload:
  * router.refresh() re-renders the server component in place.
  *
- * The server owns the state machine — this only offers the moves that are
- * legal from where the card is, and a refused move surfaces its reason.
- * Cancelling is irreversible, so it asks first.
+ * The server owns the state machine — this only offers the move that is legal
+ * from where the card is, and a refused move surfaces its reason.
  */
 export function CardActions({ card }: { card: Card }) {
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [confirming, setConfirming] = useState(false)
 
   // cancelled is terminal, so there is nothing to offer.
   if (card.status === "cancelled") {
@@ -38,7 +36,6 @@ export function CardActions({ card }: { card: Card }) {
         setError(payload?.message ?? "That did not work.")
         return
       }
-      setConfirming(false)
       router.refresh()
     } catch {
       setError("Could not reach the server.")
@@ -47,39 +44,8 @@ export function CardActions({ card }: { card: Card }) {
     }
   }
 
-  // Every label names its card: in a table of rows, "Freeze" alone does not
-  // say which one, and the row is the only thing giving it context visually.
-  if (confirming) {
-    return (
-      <div
-        role="group"
-        aria-label={`Cancel ${card.nickname}`}
-        className="flex items-center justify-end gap-2"
-      >
-        <span role="alert" className="text-sm text-gray-500">
-          Cancel for good?
-        </span>
-        <Button
-          variant="secondary"
-          className="py-1"
-          disabled={busy}
-          onClick={() => setConfirming(false)}
-        >
-          Keep
-        </Button>
-        <Button
-          variant="destructive"
-          className="py-1"
-          disabled={busy}
-          onClick={() => move("cancelled")}
-        >
-          Cancel card
-        </Button>
-      </div>
-    )
-  }
-
   const frozen = card.status === "frozen"
+  const label = frozen ? "Unfreeze" : "Freeze"
 
   return (
     <div className="flex items-center justify-end gap-2">
@@ -92,19 +58,12 @@ export function CardActions({ card }: { card: Card }) {
         variant="secondary"
         className="py-1"
         disabled={busy}
-        aria-label={`${frozen ? "Unfreeze" : "Freeze"} ${card.nickname}`}
+        // Names the card: across twenty rows "Freeze" alone does not say which,
+        // and the row supplies that context visually and nowhere else.
+        aria-label={`${label} ${card.nickname}`}
         onClick={() => move(frozen ? "active" : "frozen")}
       >
-        {frozen ? "Unfreeze" : "Freeze"}
-      </Button>
-      <Button
-        variant="ghost"
-        className="py-1 text-red-600 hover:text-red-700 dark:text-red-400"
-        disabled={busy}
-        aria-label={`Cancel ${card.nickname}`}
-        onClick={() => setConfirming(true)}
-      >
-        Cancel
+        {label}
       </Button>
     </div>
   )

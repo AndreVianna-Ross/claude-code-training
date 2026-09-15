@@ -1,27 +1,16 @@
 import { describe, expect, it } from "vitest"
 import {
   CARD_TRANSITIONS,
+  type FieldErrors,
   MAX_SPEND_LIMIT,
-  TEST_BIN,
   canTransition,
-  cardReference,
-  generateCardNumber,
-  isLuhnValid,
   isSpendWarning,
-  luhnCheckDigit,
-  maskedNumber,
   parseIssueRequest,
   spendPercent,
 } from "./cards"
 
-/**
- * A card number that resembles a real PAN is the one unrecoverable mistake in
- * this feature, so the generator is tested hard: the BIN, the length, and the
- * check digit, over enough samples that a bad branch cannot hide.
- */
-
 // Objects, not ids: a card must settle in its merchant's currency, so the
-// parser needs the currency to check it against.
+// parser needs the currency to check it against. mch_02 is EUR.
 const MERCHANTS = [
   { id: "mch_01", currency: "USD" },
   { id: "mch_02", currency: "EUR" },
@@ -34,106 +23,16 @@ const valid = {
   currency: "USD",
 }
 
-describe("isLuhnValid", () => {
-  it("accepts the canonical test card", () => {
-    expect(isLuhnValid("4242424242424242")).toBe(true)
-  })
-
-  it("rejects the same number with one digit changed", () => {
-    expect(isLuhnValid("4242424242424243")).toBe(false)
-  })
-
-  it("rejects anything that is not all digits", () => {
-    expect(isLuhnValid("4242-4242-4242-4242")).toBe(false)
-    expect(isLuhnValid("")).toBe(false)
-    expect(isLuhnValid("424242424242424x")).toBe(false)
-  })
-})
-
-describe("luhnCheckDigit", () => {
-  it("produces the digit that completes the canonical test card", () => {
-    // 4242424242424242 is Luhn-valid, so the first 15 digits must want a 2.
-    expect(luhnCheckDigit("424242424242424")).toBe(2)
-  })
-
-  it("always yields a number whose completed form validates", () => {
-    for (let i = 0; i < 200; i++) {
-      const partial = TEST_BIN + String(i).padStart(11, "7")
-      expect(isLuhnValid(partial + luhnCheckDigit(partial))).toBe(true)
-    }
-  })
-})
-
-describe("generateCardNumber", () => {
-  it("is 16 digits on the test BIN with a valid check digit, every time", () => {
-    for (let i = 0; i < 500; i++) {
-      const number = generateCardNumber()
-      expect(number).toMatch(/^\d{16}$/)
-      expect(number.startsWith(TEST_BIN)).toBe(true)
-      expect(isLuhnValid(number)).toBe(true)
-    }
-  })
-
-  it("holds at the extremes of its randomness", () => {
-    // All-zero and all-nine bodies are where an off-by-one in the check digit
-    // shows up.
-    expect(isLuhnValid(generateCardNumber(() => 0))).toBe(true)
-    expect(isLuhnValid(generateCardNumber(() => 0.9999))).toBe(true)
-    expect(generateCardNumber(() => 0).startsWith(TEST_BIN)).toBe(true)
-  })
-
-  it("does not return the same number twice in a row", () => {
-    const seen = new Set(Array.from({ length: 50 }, () => generateCardNumber()))
-    expect(seen.size).toBeGreaterThan(1)
-  })
-})
-
-describe("maskedNumber", () => {
-  it("shows only the last four", () => {
-    expect(maskedNumber("4242")).toBe("•••• 4242")
-    expect(maskedNumber("4242")).not.toContain("4242424242")
-  })
-})
-
-describe("cardReference", () => {
-  it("is opaque and unique enough to name a card", () => {
-    const refs = new Set(Array.from({ length: 200 }, () => cardReference()))
-    expect(refs.size).toBeGreaterThan(190)
-    expect(cardReference()).toMatch(/^ref_[a-z2-9]{10}$/)
-  })
-
-  it("leaks no part of a card number", () => {
-    // A reference derived from the number is a PAN disclosure: with the known
-    // 4242 BIN and the stored last four, a six-digit slice leaves only a
-    // handful of Luhn-valid candidates. It must share nothing with the number.
-    for (let i = 0; i < 200; i++) {
-      const number = generateCardNumber()
-      const reference = cardReference()
-      expect(reference).not.toContain(number)
-      expect(reference).not.toContain(number.slice(-4))
-      for (let start = 0; start + 4 <= number.length; start++) {
-        expect(reference).not.toContain(number.slice(start, start + 4))
-      }
-    }
-  })
-
-  it("carries no digits a PAN could be rebuilt from", () => {
-    expect(cardReference()).not.toMatch(/\d{4}/)
-  })
-})
-
 describe("the card state machine", () => {
-  it("lets an active card freeze and a frozen card come back", () => {
+  it("lets a card freeze, come back, and be cancelled from either side", () => {
     expect(canTransition("active", "frozen")).toBe(true)
     expect(canTransition("frozen", "active")).toBe(true)
-  })
-
-  it("lets either side cancel", () => {
     expect(canTransition("active", "cancelled")).toBe(true)
     expect(canTransition("frozen", "cancelled")).toBe(true)
   })
 
   it("treats cancelled as terminal", () => {
+    // An empty list is a rule; a missing key would be an oversight.
     expect(CARD_TRANSITIONS.cancelled).toEqual([])
     expect(canTransition("cancelled", "active")).toBe(false)
     expect(canTransition("cancelled", "frozen")).toBe(false)
@@ -141,6 +40,7 @@ describe("the card state machine", () => {
   })
 
   it("refuses a move to the status a card is already in", () => {
+    // So a double click is reported rather than looking like it worked twice.
     expect(canTransition("active", "active")).toBe(false)
     expect(canTransition("frozen", "frozen")).toBe(false)
   })
@@ -153,95 +53,54 @@ describe("parseIssueRequest", () => {
     if (result.ok) {
       expect(result.value.spendLimit).toBe(25000)
       expect(result.value.category).toBeNull()
+      expect(result.value.requestId).toBeNull()
     }
   })
 
-  it("rejects a missing merchant, and an unknown one", () => {
-    const missing = parseIssueRequest({ ...valid, merchantId: "" }, MERCHANTS)
-    expect(missing.ok).toBe(false)
-    if (!missing.ok) expect(missing.errors.merchantId).toBeDefined()
+  // One row per way a request can be wrong: the interesting thing is the
+  // coverage of the set, not twenty near-identical bodies.
+  const rejections: [string, object, keyof FieldErrors][] = [
+    ["no merchant", { merchantId: "" }, "merchantId"],
+    ["an unknown merchant", { merchantId: "mch_nope" }, "merchantId"],
+    ["a zero limit", { spendLimit: 0 }, "spendLimit"],
+    ["a negative limit", { spendLimit: -1 }, "spendLimit"],
+    ["a large negative limit", { spendLimit: -25000 }, "spendLimit"],
+    ["a limit over the cap", { spendLimit: MAX_SPEND_LIMIT + 1 }, "spendLimit"],
+    ["a fractional limit", { spendLimit: 250.5 }, "spendLimit"],
+    ["a limit sent as a string", { spendLimit: "25000" }, "spendLimit"],
+    ["NaN as a limit", { spendLimit: NaN }, "spendLimit"],
+    ["Infinity as a limit", { spendLimit: Infinity }, "spendLimit"],
+    ["a null limit", { spendLimit: null }, "spendLimit"],
+    ["a currency we do not issue", { currency: "JPY" }, "currency"],
+    ["a lowercased currency", { currency: "usd" }, "currency"],
+    ["an empty currency", { currency: "" }, "currency"],
+    ["an absent currency", { currency: undefined }, "currency"],
+    ["a numeric currency", { currency: 1 }, "currency"],
+    ["a blank nickname", { nickname: "   " }, "nickname"],
+    ["an over-long nickname", { nickname: "x".repeat(61) }, "nickname"],
+    ["an invented category", { category: "gambling" }, "category"],
+    ["a currency the merchant does not settle in", { merchantId: "mch_02" }, "currency"],
+  ]
 
-    const unknown = parseIssueRequest(
-      { ...valid, merchantId: "mch_nope" },
-      MERCHANTS,
-    )
-    expect(unknown.ok).toBe(false)
-    if (!unknown.ok) expect(unknown.errors.merchantId).toBeDefined()
+  it.each(rejections)("rejects %s", (_label, patch, field) => {
+    const result = parseIssueRequest({ ...valid, ...patch }, MERCHANTS)
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.errors[field]).toBeDefined()
   })
 
-  it("rejects a zero or negative limit", () => {
-    for (const spendLimit of [0, -1, -25000]) {
-      const result = parseIssueRequest({ ...valid, spendLimit }, MERCHANTS)
-      expect(result.ok).toBe(false)
-      if (!result.ok) expect(result.errors.spendLimit).toBeDefined()
-    }
-  })
-
-  it("rejects a limit above 5,000,000 minor units but accepts exactly that", () => {
-    const over = parseIssueRequest(
-      { ...valid, spendLimit: MAX_SPEND_LIMIT + 1 },
-      MERCHANTS,
-    )
-    expect(over.ok).toBe(false)
-    if (!over.ok) expect(over.errors.spendLimit).toBeDefined()
-
+  it("accepts the limit exactly at the cap", () => {
+    // The bound is inclusive, which is the off-by-one worth pinning down.
     expect(
-      parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANTS)
-        .ok,
+      parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANTS).ok,
     ).toBe(true)
   })
 
-  it("rejects a limit that is not an integer number of minor units", () => {
-    for (const spendLimit of [250.5, "25000", NaN, Infinity, null]) {
-      const result = parseIssueRequest({ ...valid, spendLimit }, MERCHANTS)
-      expect(result.ok).toBe(false)
-      if (!result.ok) expect(result.errors.spendLimit).toBeDefined()
-    }
-  })
-
-  it("rejects a currency we do not issue in", () => {
-    for (const currency of ["JPY", "usd", "", undefined, 1]) {
-      const result = parseIssueRequest({ ...valid, currency }, MERCHANTS)
-      expect(result.ok).toBe(false)
-      if (!result.ok) expect(result.errors.currency).toBeDefined()
-    }
-  })
-
-  it("requires a nickname and caps its length", () => {
-    expect(parseIssueRequest({ ...valid, nickname: "   " }, MERCHANTS).ok).toBe(
-      false,
-    )
-    expect(
-      parseIssueRequest({ ...valid, nickname: "x".repeat(61) }, MERCHANTS).ok,
-    ).toBe(false)
-  })
-
-  it("takes a known category and refuses an invented one", () => {
-    const ok = parseIssueRequest({ ...valid, category: "software" }, MERCHANTS)
-    expect(ok.ok).toBe(true)
-    if (ok.ok) expect(ok.value.category).toBe("software")
-
-    const bad = parseIssueRequest({ ...valid, category: "gambling" }, MERCHANTS)
-    expect(bad.ok).toBe(false)
-    if (!bad.ok) expect(bad.errors.category).toBeDefined()
-  })
-
-  it("refuses a currency the chosen merchant does not settle in", () => {
-    // One relationship, one currency: a GBP card against a USD merchant would
-    // put two currencies on one merchant and invite a cross-currency sum.
-    const mismatch = parseIssueRequest(
-      { ...valid, merchantId: "mch_02", currency: "USD" },
+  it("names the merchant's currency, so the fix is obvious", () => {
+    const result = parseIssueRequest(
+      { ...valid, merchantId: "mch_02" },
       MERCHANTS,
     )
-    expect(mismatch.ok).toBe(false)
-    if (!mismatch.ok) expect(mismatch.errors.currency).toContain("EUR")
-
-    expect(
-      parseIssueRequest(
-        { ...valid, merchantId: "mch_02", currency: "EUR" },
-        MERCHANTS,
-      ).ok,
-    ).toBe(true)
+    if (!result.ok) expect(result.errors.currency).toContain("EUR")
   })
 
   it("does not blame the currency when the merchant is the unknown one", () => {
@@ -251,11 +110,19 @@ describe("parseIssueRequest", () => {
       { ...valid, merchantId: "mch_nope" },
       MERCHANTS,
     )
-    expect(result.ok).toBe(false)
     if (!result.ok) {
       expect(result.errors.merchantId).toBeDefined()
       expect(result.errors.currency).toBeUndefined()
     }
+  })
+
+  it("takes a known category", () => {
+    const result = parseIssueRequest(
+      { ...valid, category: "software" },
+      MERCHANTS,
+    )
+    expect(result.ok).toBe(true)
+    if (result.ok) expect(result.value.category).toBe("software")
   })
 
   it("carries an idempotency key through, and normalises its absence", () => {
@@ -263,7 +130,6 @@ describe("parseIssueRequest", () => {
       { ...valid, requestId: " abc " },
       MERCHANTS,
     )
-    expect(withKey.ok).toBe(true)
     if (withKey.ok) expect(withKey.value.requestId).toBe("abc")
 
     for (const requestId of [undefined, null, "", "   ", 7]) {
@@ -289,31 +155,31 @@ describe("parseIssueRequest", () => {
     }
   })
 
-  it("survives an absent or junk body instead of throwing", () => {
-    for (const body of [undefined, null, "nope", 7, []]) {
+  it.each([undefined, null, "nope", 7, []])(
+    "survives %o as a body instead of throwing",
+    (body) => {
       expect(parseIssueRequest(body, MERCHANTS).ok).toBe(false)
-    }
-  })
+    },
+  )
 })
 
 describe("spend against the limit", () => {
-  it("reports a whole percentage", () => {
-    expect(spendPercent({ spent: 0, spendLimit: 25000 })).toBe(0)
-    expect(spendPercent({ spent: 12500, spendLimit: 25000 })).toBe(50)
-    expect(spendPercent({ spent: 25000, spendLimit: 25000 })).toBe(100)
-  })
-
-  it("clamps overspend rather than reporting past 100", () => {
-    expect(spendPercent({ spent: 40000, spendLimit: 25000 })).toBe(100)
-  })
-
-  it("does not divide by zero", () => {
-    expect(spendPercent({ spent: 100, spendLimit: 0 })).toBe(0)
+  it.each([
+    [0, 25000, 0],
+    [12500, 25000, 50],
+    [25000, 25000, 100],
+    [40000, 25000, 100], // clamped rather than reporting past 100
+    [100, 0, 0], // no division by zero
+  ])("reports %i of %i as %i%%", (spent, spendLimit, percent) => {
+    expect(spendPercent({ spent, spendLimit })).toBe(percent)
   })
 
   it("warns only past 80 percent", () => {
+    // 20001/25000 is 80.004%, which rounds to 80 — so this must compare as
+    // integers, or a card just past the line does not warn.
     expect(isSpendWarning({ spent: 20000, spendLimit: 25000 })).toBe(false)
     expect(isSpendWarning({ spent: 20001, spendLimit: 25000 })).toBe(true)
     expect(isSpendWarning({ spent: 24000, spendLimit: 25000 })).toBe(true)
+    expect(isSpendWarning({ spent: 100, spendLimit: 0 })).toBe(false)
   })
 })

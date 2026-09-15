@@ -1,4 +1,4 @@
-import { cardReference, generateCardNumber } from "@/lib/cards"
+import { cardReference, generateCardNumber } from "@/lib/card-number"
 import { merchants } from "./merchants"
 import {
   Card,
@@ -168,76 +168,42 @@ export function generate() {
  * moment the last four is taken — the seed holds no full number either.
  */
 function generateCards(): Card[] {
-  const seeds: {
-    nickname: string
-    merchantIndex: number
-    spendLimit: number
-    spent: number
-    category: Card["category"]
-    status: Card["status"]
-    daysAgo: number
-  }[] = [
-    {
-      nickname: "Google Ads",
-      merchantIndex: 0,
-      spendLimit: 250_000,
-      spent: 218_400,
-      category: "advertising",
-      status: "active",
-      daysAgo: 28,
-    },
-    {
-      nickname: "Figma seats",
-      merchantIndex: 2,
-      spendLimit: 60_000,
-      spent: 14_900,
-      category: "software",
-      status: "active",
-      daysAgo: 12,
-    },
-    {
-      nickname: "Contractor — Q3 audit",
-      merchantIndex: 4,
-      spendLimit: 500_000,
-      spent: 0,
-      category: "contractors",
-      status: "frozen",
-      daysAgo: 3,
-    },
-  ]
+  // [nickname, merchant index, limit, spent, category, status, days before
+  // GENERATED_AT]. Amounts are minor units. The second card sits past 80% of
+  // its limit on purpose: that is the case the spend bar warns on.
+  const seeds = [
+    ["Google Ads", 0, 250_000, 218_400, "advertising", "active", 28],
+    ["Figma seats", 2, 60_000, 14_900, "software", "active", 12],
+    ["Contractor — Q3 audit", 4, 500_000, 0, "contractors", "frozen", 3],
+  ] as const
 
-  return seeds.map((seed, index) => {
-    const merchant = merchants[seed.merchantIndex]
-    const number = generateCardNumber(rand)
-    // Pinned to GENERATED_AT like every other seed in this module, so the
-    // seeded dates do not drift with the wall clock between two runs.
-    const createdAt = new Date(
-      GENERATED_AT.getTime() - seed.daysAgo * 86_400_000,
-    ).toISOString()
+  return seeds.map(
+    (
+      [nickname, merchantIndex, spendLimit, spent, category, status, daysAgo],
+      index,
+    ) => {
+      const merchant = merchants[merchantIndex]
+      const number = generateCardNumber(rand)
 
-    return {
-      id: `card_${String(index + 1).padStart(4, "0")}`,
-      nickname: seed.nickname,
-      merchantId: merchant.id,
-      spendLimit: seed.spendLimit,
-      spent: seed.spent,
-      currency: merchant.currency,
-      last4: number.slice(-4),
-      reference: cardReference(rand),
-      category: seed.category,
-      status: seed.status,
-      createdAt,
-      // Seeds carry the history that produced their current status, so the
-      // audit trail is not empty for cards that predate the first click.
-      history:
-        seed.status === "active"
-          ? [{ at: createdAt, action: "issued" as const }]
-          : [
-              { at: createdAt, action: "issued" as const },
-              { at: createdAt, action: seed.status, from: "active" as const },
-            ],
-    }
-  })
+      return {
+        id: `card_${pad(index + 1, 4)}`,
+        nickname,
+        merchantId: merchant.id,
+        spendLimit,
+        spent,
+        currency: merchant.currency,
+        last4: number.slice(-4),
+        reference: cardReference(rand),
+        category,
+        status,
+        // Pinned to GENERATED_AT like every other seed here, so the dates do
+        // not drift with the wall clock between two runs.
+        createdAt: new Date(
+          GENERATED_AT.getTime() - daysAgo * 86_400_000,
+        ).toISOString(),
+      }
+    },
+  )
 }
 
 function generatePayouts(payments: Payment[]): Payout[] {

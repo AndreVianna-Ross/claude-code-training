@@ -1,9 +1,5 @@
-import {
-  IssueCardInput,
-  canTransition,
-  cardReference,
-  generateCardNumber,
-} from "@/lib/cards"
+import { cardReference, generateCardNumber } from "@/lib/card-number"
+import { IssueCardInput, canTransition } from "@/lib/cards"
 import { store } from "./store"
 import { Card, CardStatus } from "./types"
 
@@ -65,7 +61,6 @@ export function issueCard(input: IssueCardInput): {
   }
 
   const number = generateCardNumber()
-  const at = new Date().toISOString()
 
   const card: Card = {
     id: nextCardId(),
@@ -78,8 +73,7 @@ export function issueCard(input: IssueCardInput): {
     reference: cardReference(),
     category: input.category,
     status: "active",
-    createdAt: at,
-    history: [{ at, action: "issued" }],
+    createdAt: new Date().toISOString(),
   }
 
   store.cards.push(card)
@@ -107,11 +101,6 @@ export function transitionCard(id: string, to: CardStatus): TransitionResult {
   if (!card) return { ok: false, reason: "not_found" }
   if (!canTransition(card.status, to)) return { ok: false, reason: "illegal" }
 
-  card.history.push({
-    at: new Date().toISOString(),
-    action: to,
-    from: card.status,
-  })
   card.status = to
   return { ok: true, card }
 }

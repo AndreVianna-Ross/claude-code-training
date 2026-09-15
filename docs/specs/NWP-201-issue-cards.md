@@ -40,29 +40,30 @@ At the start of this ticket there was no card code: no `Card`, no `CardStatus`, 
 
 ## Approach
 
-Cards are a new entity, so they get their own pair of modules rather than being wedged into the payments builder: `src/lib/cards.ts` holds pure logic (generation, masking, the transition table, validation) and `src/data/cards.ts` holds store access. That leaves `src/data/queries.ts` as the one *payment* query builder, which is what ORG-6 protects.
+Cards are a new entity, so they get their own modules rather than being wedged into the payments builder: `src/lib/card-number.ts` holds PAN generation and masking, `src/lib/cards.ts` the remaining pure rules, and `src/data/cards.ts` the store access. That leaves `src/data/queries.ts` as the one *payment* query builder, which is what ORG-6 protects.
 
 The full number exists only as the return value of `issueCard` and the body of the creation response. The `Card` record has **no field for it**, so masking everywhere else follows from the type rather than from discipline. Validation is a pure parse returning a value or per-field errors, so the route is a thin shell and every rule is unit-testable without HTTP.
 
-**Rejected:** storing the number and filtering it out of responses — one new endpoint or one stray spread and the PAN is out; a record with nowhere to put it cannot leak it. **Rejected:** a `reference` derived from the number — with the known `4242` BIN and the stored last four, even a six-digit slice narrows the PAN to a handful of Luhn-valid candidates, so the reference is drawn independently from a digit-free alphabet. **Rejected:** putting the category on `Merchant` — the ticket calls it a card lock, and adding a field would edit seed data the rules protect.
+**Rejected:** storing the number and filtering it out of responses — one new endpoint or one stray spread and the PAN is out; a record with nowhere to put it cannot leak it. **Rejected:** a `reference` derived from the number — with the known `4242` BIN and the stored last four, even a six-digit slice narrows the PAN to a handful of Luhn-valid candidates, so the reference is drawn independently of the number. Its alphabet is not digit-free — it carries `2-9`, minus the confusable `0`, `1`, `i`, `l` and `o` — and that is fine, because the property that matters is independence, not the absence of digits. **Rejected:** putting the category on `Merchant` — the ticket calls it a card lock, and adding a field would edit seed data the rules protect.
 
 ## File map
 
 | File | Add or change | Why |
 | --- | --- | --- |
-| `src/data/types.ts` | change | `CardStatus`, `CardCategory`, `Card`, `CardEvent`. Amounts in minor units. **No field for the full number.** |
-| `src/lib/cards.ts` | add | `luhnCheckDigit`, `isLuhnValid`, `generateCardNumber` (injectable `random` so extremes are testable), `maskedNumber`, `cardReference`, `CARD_TRANSITIONS` + `canTransition`, `isCardStatus`, `parseIssueRequest(body, merchants)`, `spendPercent`, `isSpendWarning`. |
-| `src/lib/cards.test.ts` | add | The generator over 500 samples plus its extremes; the reference sharing nothing with a number; every transition; every validation rejection. |
+| `src/data/types.ts` | change | `CardStatus`, `CardCategory`, `Card`. Amounts in minor units. **No field for the full number.** |
+| `src/lib/card-number.ts` | add | The only module that ever holds a full PAN, kept small enough to review alone: `luhnCheckDigit`, `isLuhnValid`, `generateCardNumber` (injectable `random` so the extremes are testable), `maskedNumber`, `cardReference`. |
+| `src/lib/cards.ts` | add | The rest of the pure rules: `CARD_TRANSITIONS` + `canTransition`, `isCardStatus`, `parseIssueRequest(body, merchants)`, `spendPercent`, `isSpendWarning`, and the allowlists. |
+| `src/lib/card-number.test.ts`, `src/lib/cards.test.ts` | add | The generator over 500 samples plus its extremes; the reference sharing no run with a number; every transition; a row per validation rejection. |
 | `src/data/cards.ts` | add | `listCards()` newest first, `cardById`, `issueCard(input)` → `{ card, number, replayed }`, `transitionCard(id, to)`. |
-| `src/data/cards.test.ts` | add | What pure rules cannot reach: idempotent issuing, history appends, list ordering. |
+| `src/data/cards.test.ts` | add | What pure rules cannot reach: idempotent issuing, the transition guard against the real store, list ordering. |
 | `src/data/store.ts` | change | A `cards: Card[]` slice. |
 | `src/data/generate.ts` | change | Three cards seeded through the real generator, pinned to `GENERATED_AT`: one active, one active past 80% (the amber case), one frozen. Only `last4` and a reference are kept. |
 | `src/app/api/cards/route.ts` | add | `GET` masked list. `POST` issues: `400 {message, fields}`, `201 {card, number}`, or `200` with `number: null` on a replay. `cache-control: no-store`. |
 | `src/app/api/cards/[id]/route.ts` | add | `GET` one card (404 on a miss). `PATCH` transitions: 400 bad status, 404 unknown, 409 illegal, 200 + card. |
 | `src/app/cards/page.tsx` | add | The list. Written empty state. |
-| `src/app/cards/issue-dialog.tsx` | add | `Drawer` form → one-time reveal panel, cleared on close. `Field` wraps the label/error markup used five times. |
-| `src/app/cards/card-actions.tsx` | add | Freeze, unfreeze and cancel via `PATCH` + `router.refresh()`. Cancel asks first. |
-| `src/app/cards/[id]/page.tsx` | add | Full record, spend bar amber past 80%, and the history list in the merchant's timezone. |
+| `src/app/cards/issue-dialog.tsx` | add | `Drawer` form → one-time reveal panel, cleared on close. `Field` and `Choice` wrap the label/error and Select markup, each repeated several times. |
+| `src/app/cards/card-actions.tsx` | add | Freeze and unfreeze via `PATCH` + `router.refresh()`. `—` for a cancelled card. |
+| `src/app/cards/[id]/page.tsx` | add | Full record and spend bar, amber past 80%. Created date in the merchant's timezone. |
 | `src/app/siteConfig.ts`, `AppSidebar.tsx` | change | A `cards` base link and a Cards nav row. |
 | `src/components/ui/cards/CardStatusBadge.tsx` | add | Card statuses, following the payments badge shape. A separate component because `active` means something different for a card, and the payments union has no `frozen` or `cancelled`. |
 
@@ -71,9 +72,9 @@ The full number exists only as the return value of `issueCard` and the body of t
 1. **A card settles in its merchant's currency.** Each merchant has exactly one, and the money rule forbids summing across currencies, so a GBP card on a USD merchant would put two currencies on one relationship. `parseIssueRequest` takes merchants rather than ids so it can enforce this; the form offers only the accepted currency rather than inviting a 400.
 2. **Issuing is idempotent** on a caller-supplied `requestId`. A replay returns the same card with `200` and **no number** — otherwise a retry becomes a second read of a one-time secret.
 3. **`frozen → frozen` is refused with 409**, not accepted as a no-op, so a double click is reported rather than looking like it worked twice.
-4. **Cancel is in the UI behind a confirm step**, because it is terminal.
+4. **Cancelling is server-side only.** The transition is implemented and tested (`active`/`frozen` → `cancelled`, terminal), but no UI control ships: it is irreversible, and a one-way action deserves a confirmation design this ticket did not ask for.
 5. **No filtering, sorting or pagination** on `/cards`. Twelve to twenty cards a week does not need it, and a second filter path would break ORG-6 for no benefit.
-6. **Row actions name their card.** `Freeze` alone does not say which card when there are twenty rows — the row supplies that context visually and nowhere else — so each button carries an `aria-label` naming it, and the cancel confirm is a `role="group"` with an accessible name and a `role="alert"` prompt.
+6. **Row actions name their card.** `Freeze` alone does not say which card when there are twenty rows — the row supplies that context visually and nowhere else — so the button carries an `aria-label` naming it.
 7. **The spend bar's width is an inline `style`**, which `.claude/rules/components.md:10` otherwise forbids. A computed percentage is the one thing the Tailwind JIT cannot express, since it only sees literal class strings, and there is no `ProgressBar` primitive in `src/components/`. The repo's own components do the same for derived values (`Drawer.tsx:59`, `BarChart.tsx:399`). Recorded here so it reads as a decision rather than an oversight.
 
 ## Plan

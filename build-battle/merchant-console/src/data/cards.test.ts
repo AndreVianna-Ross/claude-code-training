@@ -36,15 +36,11 @@ describe("issueCard", () => {
     expect(cardById(card.id)).toBe(card)
   })
 
-  it("starts a card active, unspent, with an issued event", () => {
+  it("starts a card active and unspent", () => {
     const { card } = issueCard({ ...request })
 
     expect(card.status).toBe("active")
     expect(card.spent).toBe(0)
-    expect(card.history).toHaveLength(1)
-    expect(card.history[0].action).toBe("issued")
-    expect(card.history[0].from).toBeUndefined()
-    expect(card.createdAt).toBe(card.history[0].at)
   })
 
   it("mints one card per request id, however many times it is retried", () => {
@@ -55,31 +51,21 @@ describe("issueCard", () => {
     expect(second.card.id).toBe(first.card.id)
     expect(third.card.id).toBe(first.card.id)
     expect(store.cards.length).toBe(before + 1)
-  })
 
-  it("does not hand the number back on a replay", () => {
-    // Otherwise a retry becomes a second read of a one-time secret.
-    const first = issueCard({ ...request, requestId: "once-only" })
-    const replay = issueCard({ ...request, requestId: "once-only" })
-
+    // A replay carries no number: otherwise a retry is a second read of a
+    // one-time secret.
     expect(first.number).toMatch(/^\d{16}$/)
-    expect(replay.replayed).toBe(true)
-    expect(replay.number).toBeNull()
+    expect(second.replayed).toBe(true)
+    expect(second.number).toBeNull()
   })
 
-  it("treats a different key as a different card", () => {
-    const a = issueCard({ ...request, requestId: "key-a" })
-    const b = issueCard({ ...request, requestId: "key-b" })
-
-    expect(b.card.id).not.toBe(a.card.id)
-    expect(store.cards.length).toBe(before + 2)
-  })
-
-  it("does not dedupe when no key is sent", () => {
+  it("treats a different key, or no key, as a different card", () => {
+    issueCard({ ...request, requestId: "key-a" })
+    issueCard({ ...request, requestId: "key-b" })
     issueCard({ ...request })
     issueCard({ ...request })
 
-    expect(store.cards.length).toBe(before + 2)
+    expect(store.cards.length).toBe(before + 4)
   })
 
   it("gives every card an id no existing card holds", () => {
@@ -92,32 +78,19 @@ describe("issueCard", () => {
 })
 
 describe("transitionCard", () => {
-  it("appends the move it made, and where it came from", () => {
+  it("moves a card both ways, and seals it once cancelled", () => {
     const { card } = issueCard({ ...request })
 
     expect(transitionCard(card.id, "frozen").ok).toBe(true)
     expect(transitionCard(card.id, "active").ok).toBe(true)
+    expect(transitionCard(card.id, "cancelled").ok).toBe(true)
 
-    expect(card.history.map((event) => event.action)).toEqual([
-      "issued",
-      "frozen",
-      "active",
-    ])
-    expect(card.history[1].from).toBe("active")
-    expect(card.history[2].from).toBe("frozen")
-  })
-
-  it("writes nothing when it refuses the move", () => {
-    const { card } = issueCard({ ...request })
-    transitionCard(card.id, "cancelled")
-    const sealed = card.history.length
-
+    // cancelled is terminal: nothing comes back from it.
     expect(transitionCard(card.id, "active")).toEqual({
       ok: false,
       reason: "illegal",
     })
     expect(card.status).toBe("cancelled")
-    expect(card.history).toHaveLength(sealed)
   })
 
   it("reports an unknown card rather than throwing", () => {
