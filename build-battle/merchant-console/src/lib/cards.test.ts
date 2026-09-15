@@ -88,39 +88,25 @@ describe("parseIssueRequest", () => {
     ).toBe(true)
   })
 
-  it("names the merchant's currency, so the fix is obvious", () => {
-    const result = parseIssueRequest(
-      { ...valid, merchantId: "mch_02" },
-      MERCHANTS,
-    )
-    if (!result.ok) expect(result.errors.currency).toContain("EUR")
-  })
+  it("names the merchant's currency, and blames only the merchant when it is the unknown one", () => {
+    const mismatch = parseIssueRequest({ ...valid, merchantId: "mch_02" }, MERCHANTS)
+    if (!mismatch.ok) expect(mismatch.errors.currency).toContain("EUR")
 
-  it("does not blame the currency when the merchant is the unknown one", () => {
-    const result = parseIssueRequest(
-      { ...valid, merchantId: "mch_nope" },
-      MERCHANTS,
-    )
-    if (!result.ok) {
-      expect(result.errors.merchantId).toBeDefined()
-      expect(result.errors.currency).toBeUndefined()
+    const unknown = parseIssueRequest({ ...valid, merchantId: "mch_nope" }, MERCHANTS)
+    if (!unknown.ok) {
+      expect(unknown.errors.merchantId).toBeDefined()
+      expect(unknown.errors.currency).toBeUndefined()
     }
   })
 
   it("takes a known category", () => {
-    const result = parseIssueRequest(
-      { ...valid, category: "software" },
-      MERCHANTS,
-    )
+    const result = parseIssueRequest({ ...valid, category: "software" }, MERCHANTS)
     expect(result.ok).toBe(true)
     if (result.ok) expect(result.value.category).toBe("software")
   })
 
   it("carries an idempotency key through, and normalises its absence", () => {
-    const withKey = parseIssueRequest(
-      { ...valid, requestId: " abc " },
-      MERCHANTS,
-    )
+    const withKey = parseIssueRequest({ ...valid, requestId: " abc " }, MERCHANTS)
     if (withKey.ok) expect(withKey.value.requestId).toBe("abc")
 
     for (const requestId of [undefined, null, "", "   ", 7]) {
