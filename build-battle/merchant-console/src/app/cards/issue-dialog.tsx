@@ -36,6 +36,12 @@ const NONE = "__none__"
 
 type Merchant = { id: string; name: string; currency: Currency }
 type Option = readonly [value: string, label: string]
+type Issued = { card: Card; number: string }
+
+const CATEGORY_OPTIONS: readonly Option[] = [
+  [NONE, "No lock"],
+  ...CARD_CATEGORIES.map((value) => [value, CARD_CATEGORY_LABELS[value]] as const),
+]
 
 function Field(props: {
   id: string
@@ -104,9 +110,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
   const [errors, setErrors] = useState<FieldErrors>({})
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
-  const [issued, setIssued] = useState<{ card: Card; number: string } | null>(
-    null,
-  )
+  const [issued, setIssued] = useState<Issued | null>(null)
   const [requestId, setRequestId] = useState(() => crypto.randomUUID())
 
   const selected = merchants.find((entry) => entry.id === merchantId) ?? null
@@ -127,17 +131,15 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
   }
 
   const submit = async () => {
-    setSaving(true)
     setErrors({})
     setFormError(null)
-
     const spendLimit = parseAmountToMinorUnits(limit)
     if (spendLimit === null) {
       setErrors({ spendLimit: "Enter an amount like 250 or 250.00." })
-      setSaving(false)
       return
     }
 
+    setSaving(true)
     try {
       const response = await fetch("/api/cards", {
         method: "POST",
@@ -284,12 +286,7 @@ export function IssueCardDialog({ merchants }: { merchants: Merchant[] }) {
                 error={errors.category}
                 value={category}
                 onChange={setCategory}
-                options={[
-                  [NONE, "No lock"] as const,
-                  ...CARD_CATEGORIES.map(
-                    (value) => [value, CARD_CATEGORY_LABELS[value]] as const,
-                  ),
-                ]}
+                options={CATEGORY_OPTIONS}
               />
             </DrawerBody>
 

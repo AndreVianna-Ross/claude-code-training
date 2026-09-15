@@ -23,12 +23,9 @@ export function CardActions({ card }: { card: Card }) {
         headers: { "content-type": "application/json" },
         body: JSON.stringify({ status }),
       })
-      if (!response.ok) {
-        const payload = await response.json().catch(() => null)
-        setError(payload?.message ?? "That did not work.")
-        return
-      }
-      router.refresh()
+      if (response.ok) return router.refresh()
+      const payload = await response.json().catch(() => null)
+      setError(payload?.message ?? "That did not work.")
     } catch {
       setError("Could not reach the server.")
     } finally {

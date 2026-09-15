@@ -15,6 +15,9 @@ import { cx } from "@/lib/utils"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
+const CHIP =
+  "rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300"
+
 const BAR_WIDTHS = [
   "w-0", "w-[5%]", "w-[10%]", "w-[15%]", "w-[20%]", "w-[25%]", "w-[30%]",
   "w-[35%]", "w-[40%]", "w-[45%]", "w-[50%]", "w-[55%]", "w-[60%]", "w-[65%]",
@@ -33,7 +36,10 @@ export default async function CardDetail({
   const merchant = merchantById(card.merchantId)
   const percent = spendPercent(card)
   const warning = isSpendWarning(card)
+  const spent = formatMoney(card.spent, card.currency)
+  const of = formatMoney(card.spendLimit, card.currency)
   const remaining = Math.max(0, card.spendLimit - card.spent)
+  const left = formatMoney(remaining, card.currency)
   const zone = merchant?.timezone ?? "UTC"
 
   return (
@@ -51,9 +57,7 @@ export default async function CardDetail({
         </h1>
         <CardStatusBadge status={card.status} />
         {card.category && (
-          <span className="rounded-md bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-700 dark:bg-gray-800 dark:text-gray-300">
-            {CARD_CATEGORY_LABELS[card.category]} only
-          </span>
+          <span className={CHIP}>{CARD_CATEGORY_LABELS[card.category]} only</span>
         )}
       </div>
       <p className="mt-1 font-mono text-sm text-gray-500">
@@ -71,8 +75,7 @@ export default async function CardDetail({
             Spend against limit
           </h2>
           <p className="text-sm tabular-nums text-gray-500">
-            {formatMoney(card.spent, card.currency)} of{" "}
-            {formatMoney(card.spendLimit, card.currency)} · {percent}%
+            {spent} of {of} · {percent}%
           </p>
         </div>
         <div
@@ -93,9 +96,7 @@ export default async function CardDetail({
         </div>
 
         <p className="mt-2 text-sm text-gray-500">
-          {warning
-            ? `Past 80% of the limit — ${formatMoney(remaining, card.currency)} left.`
-            : `${formatMoney(remaining, card.currency)} left to spend.`}
+          {warning ? `Past 80% of the limit — ${left} left.` : `${left} left to spend.`}
         </p>
       </section>
 
@@ -105,12 +106,8 @@ export default async function CardDetail({
         {(
           [
             ["Merchant", merchant?.name ?? card.merchantId, false],
-            [
-              "Spend limit",
-              `${formatMoney(card.spendLimit, card.currency)} ${card.currency}`,
-              false,
-            ],
-            ["Spent", formatMoney(card.spent, card.currency), false],
+            ["Spend limit", `${of} ${card.currency}`, false],
+            ["Spent", spent, false],
             ["Number", maskedNumber(card.last4), true],
             ["Reference", card.reference, true],
             [

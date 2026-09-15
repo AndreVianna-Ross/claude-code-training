@@ -18,9 +18,8 @@ export const CARD_TRANSITIONS: Record<CardStatus, readonly CardStatus[]> = {
   cancelled: [],
 }
 
-export function canTransition(from: CardStatus, to: CardStatus): boolean {
-  return CARD_TRANSITIONS[from].includes(to)
-}
+export const canTransition = (from: CardStatus, to: CardStatus): boolean =>
+  CARD_TRANSITIONS[from].includes(to)
 
 export function isCardStatus(value: unknown): value is CardStatus {
   return value === "active" || value === "frozen" || value === "cancelled"
@@ -43,6 +42,8 @@ export type ParseResult =
   | { ok: true; value: IssueCardInput }
   | { ok: false; errors: FieldErrors }
 
+const asString = (value: unknown) => (typeof value === "string" ? value : "")
+
 export function parseIssueRequest(
   body: unknown,
   merchants: readonly { id: string; currency: Currency }[],
@@ -50,15 +51,14 @@ export function parseIssueRequest(
   const errors: FieldErrors = {}
   const input = (body ?? {}) as Record<string, unknown>
 
-  const nickname =
-    typeof input.nickname === "string" ? input.nickname.trim() : ""
+  const nickname = asString(input.nickname).trim()
   if (!nickname) {
     errors.nickname = "Give the card a nickname."
   } else if (nickname.length > NICKNAME_MAX) {
     errors.nickname = `Keep the nickname under ${NICKNAME_MAX} characters.`
   }
 
-  const merchantId = typeof input.merchantId === "string" ? input.merchantId : ""
+  const merchantId = asString(input.merchantId)
   const merchant = merchants.find((entry) => entry.id === merchantId) ?? null
   if (!merchantId) {
     errors.merchantId = "Choose a merchant."
@@ -93,10 +93,7 @@ export function parseIssueRequest(
 
   if (Object.keys(errors).length > 0) return { ok: false, errors }
 
-  const requestId =
-    typeof input.requestId === "string" && input.requestId.trim()
-      ? input.requestId.trim()
-      : null
+  const requestId = asString(input.requestId).trim() || null
 
   return {
     ok: true,
@@ -118,12 +115,11 @@ export function spendPercent(card: Pick<Card, "spent" | "spendLimit">): number {
 
 export const SPEND_WARN_PERCENT = 80
 
-export function isSpendWarning(
+export const isSpendWarning = (
   card: Pick<Card, "spent" | "spendLimit">,
-): boolean {
-  if (card.spendLimit <= 0) return false
-  return card.spent * 100 > card.spendLimit * SPEND_WARN_PERCENT
-}
+): boolean =>
+  card.spendLimit > 0 &&
+  card.spent * 100 > card.spendLimit * SPEND_WARN_PERCENT
 
 export const CARD_CATEGORY_LABELS: Record<CardCategory, string> = {
   advertising: "Advertising",

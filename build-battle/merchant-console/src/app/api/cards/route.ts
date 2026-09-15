@@ -25,7 +25,6 @@ export async function POST(request: NextRequest) {
   }
 
   const { card, number, replayed } = issueCard(parsed.value)
-
   return NextResponse.json(
     { card, number, replayed },
     { status: replayed ? 200 : 201, headers: { "cache-control": "no-store" } },

@@ -150,8 +150,7 @@ export function generate() {
   }
 
   const payouts = generatePayouts(payments)
-  const cards = generateCards()
-  return { payments, refunds, disputes, payouts, cards }
+  return { payments, refunds, disputes, payouts, cards: generateCards() }
 }
 
 function generateCards(): Card[] {

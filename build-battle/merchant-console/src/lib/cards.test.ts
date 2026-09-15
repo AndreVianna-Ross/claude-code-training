@@ -123,12 +123,8 @@ describe("parseIssueRequest", () => {
     )
     expect(result.ok).toBe(false)
     if (!result.ok) {
-      expect(Object.keys(result.errors).sort()).toEqual([
-        "currency",
-        "merchantId",
-        "nickname",
-        "spendLimit",
-      ])
+      const fields = ["currency", "merchantId", "nickname", "spendLimit"]
+      expect(Object.keys(result.errors).sort()).toEqual(fields)
     }
   })
 

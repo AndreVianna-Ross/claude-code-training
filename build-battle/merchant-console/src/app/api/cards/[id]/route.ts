@@ -2,10 +2,9 @@ import { cardById, transitionCard } from "@/data/cards"
 import { isCardStatus } from "@/lib/cards"
 import { NextRequest, NextResponse } from "next/server"
 
-export async function GET(
-  _request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+type Context = { params: Promise<{ id: string }> }
+
+export async function GET(_request: NextRequest, { params }: Context) {
   const { id } = await params
   const card = cardById(id)
 
@@ -15,10 +14,7 @@ export async function GET(
   return NextResponse.json({ card })
 }
 
-export async function PATCH(
-  request: NextRequest,
-  { params }: { params: Promise<{ id: string }> },
-) {
+export async function PATCH(request: NextRequest, { params }: Context) {
   const { id } = await params
 
   let body: unknown
@@ -42,9 +38,7 @@ export async function PATCH(
     return result.reason === "not_found"
       ? NextResponse.json({ message: "No such card." }, { status: 404 })
       : NextResponse.json(
-          {
-            message: `That card cannot move to ${status} from where it is.`,
-          },
+          { message: `That card cannot move to ${status} from where it is.` },
           { status: 409 },
         )
   }

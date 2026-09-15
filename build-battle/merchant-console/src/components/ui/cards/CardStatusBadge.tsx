@@ -3,23 +3,20 @@ import { CardStatus } from "@/data/types"
 import { CARD_STATUS_LABELS } from "@/lib/cards"
 import { cx } from "@/lib/utils"
 
-const DOTS: Record<CardStatus, string> = {
-  active: "bg-emerald-600 dark:bg-emerald-400",
-  frozen: "bg-blue-500 dark:bg-blue-500",
-  cancelled: "bg-gray-500 dark:bg-gray-500",
-}
+type Look = [variant: "success" | "default" | "neutral", dot: string]
 
-const VARIANTS: Record<CardStatus, "success" | "default" | "neutral"> = {
-  active: "success",
-  frozen: "default",
-  cancelled: "neutral",
+const LOOKS: Record<CardStatus, Look> = {
+  active: ["success", "bg-emerald-600 dark:bg-emerald-400"],
+  frozen: ["default", "bg-blue-500 dark:bg-blue-500"],
+  cancelled: ["neutral", "bg-gray-500 dark:bg-gray-500"],
 }
 
 export function CardStatusBadge({ status }: { status: CardStatus }) {
+  const [variant, dot] = LOOKS[status]
   return (
-    <Badge variant={VARIANTS[status]} className="rounded-full">
+    <Badge variant={variant} className="rounded-full">
       <span
-        className={cx("size-1.5 shrink-0 rounded-full", DOTS[status])}
+        className={cx("size-1.5 shrink-0 rounded-full", dot)}
         aria-hidden="true"
       />
       {CARD_STATUS_LABELS[status]}

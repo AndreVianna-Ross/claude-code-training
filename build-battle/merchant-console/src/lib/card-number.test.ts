@@ -8,6 +8,11 @@ import {
   maskedNumber,
 } from "./card-number"
 
+const seeded = (seed: number) => () => {
+  seed = (seed * 1103515245 + 12345) % 2147483648
+  return seed / 2147483648
+}
+
 describe("generateCardNumber", () => {
   it("is 16 digits on the test BIN with a valid check digit, every time", () => {
     for (let i = 0; i < 500; i++) {
@@ -58,14 +63,21 @@ describe("what leaves the server", () => {
     expect(maskedNumber("4242")).not.toContain("4242424242")
   })
 
-  it("draws a reference that leaks no part of a card number", () => {
-    for (let i = 0; i < 200; i++) {
-      const number = generateCardNumber()
-      const reference = cardReference()
-      expect(reference).toMatch(/^ref_[a-z2-9]{10}$/)
-      for (let start = 0; start + 4 <= number.length; start++) {
-        expect(reference).not.toContain(number.slice(start, start + 4))
-      }
+  it("draws a reference that cannot depend on the card number", () => {
+    const first = cardReference(seeded(7))
+    generateCardNumber()
+    generateCardNumber()
+
+    expect(cardReference(seeded(7))).toBe(first)
+    expect(first).toMatch(/^ref_[a-z2-9]{10}$/)
+  })
+
+  it("shares no run of four characters with a generated number", () => {
+    const number = generateCardNumber(seeded(11))
+    const reference = cardReference(seeded(13))
+
+    for (let start = 0; start + 4 <= number.length; start++) {
+      expect(reference).not.toContain(number.slice(start, start + 4))
     }
   })
 

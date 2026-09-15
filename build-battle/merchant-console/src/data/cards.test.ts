@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest"
+import { describe, expect, it } from "vitest"
 import { cardById, issueCard, listCards, transitionCard } from "./cards"
 import { store } from "./store"
 
@@ -10,12 +10,6 @@ const request = {
   category: null,
   requestId: null,
 }
-
-let before: number
-
-beforeEach(() => {
-  before = store.cards.length
-})
 
 describe("issueCard", () => {
   it("returns the number once, never stores it, and starts the card clean", () => {
@@ -31,6 +25,7 @@ describe("issueCard", () => {
   })
 
   it("mints one card per request id, however many times it is retried", () => {
+    const before = store.cards.length
     const first = issueCard({ ...request, requestId: "retry-me" })
     const second = issueCard({ ...request, requestId: "retry-me" })
     const third = issueCard({ ...request, requestId: "retry-me" })
@@ -45,6 +40,7 @@ describe("issueCard", () => {
   })
 
   it("treats a different key, or no key, as a different card", () => {
+    const before = store.cards.length
     issueCard({ ...request, requestId: "key-a" })
     issueCard({ ...request, requestId: "key-b" })
     issueCard({ ...request })

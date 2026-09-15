@@ -48,9 +48,7 @@ export function isLuhnValid(number: string): boolean {
   return sum % 10 === 0
 }
 
-export function maskedNumber(last4: string): string {
-  return `•••• ${last4}`
-}
+export const maskedNumber = (last4: string): string => `•••• ${last4}`
 
 const REFERENCE_ALPHABET = "abcdefghjkmnpqrstuvwxyz23456789"
 const REFERENCE_LENGTH = 10
