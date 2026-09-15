@@ -1,3 +1,4 @@
+import { isSpendWarning } from "@/lib/cards"
 import { describe, expect, it } from "vitest"
 import { cardById, issueCard, listCards, transitionCard } from "./cards"
 import { store } from "./store"
@@ -79,5 +80,24 @@ describe("listCards", () => {
     const listed = listCards()
     listed.reverse()
     expect(listCards()[0].id).not.toBe(listed[0].id)
+  })
+})
+
+describe("the seeded cards", () => {
+  it("take their spend from captured payments, and keep one in the amber band", () => {
+    const { payments, cards } = store
+
+    for (const card of cards) {
+      const captured = payments.filter(
+        (p) => p.merchantId === card.merchantId && p.status === "captured",
+      )
+      let running = 0
+      const sums = [0, ...captured.map((p) => (running += p.amount))]
+
+      expect(sums).toContain(card.spent)
+      expect(card.spent).toBeLessThanOrEqual(card.spendLimit)
+    }
+
+    expect(cards.filter(isSpendWarning)).toHaveLength(1)
   })
 })

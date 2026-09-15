@@ -45,7 +45,7 @@ The full number exists only as the return value of `issueCard` and the body of t
 | `src/lib/card-number.ts` | add | The only module that ever holds a full PAN, so it stays small: `generateCardNumber` (injectable `random`), `luhnCheckDigit`, `isLuhnValid`, `maskedNumber`, `cardReference`, `TEST_BIN`. |
 | `src/lib/cards.ts` | add | `CARD_TRANSITIONS` + `canTransition`, `isCardStatus`, `parseIssueRequest(body, merchants)`, `spendPercent`, `isSpendWarning`, the allowlists with their label maps, and the limits: `MAX_SPEND_LIMIT` 5,000,000, `NICKNAME_MAX` 60, `SPEND_WARN_PERCENT` 80. |
 | `src/data/cards.ts` | add | `listCards()` newest first with an id tie-break (two cards can share a millisecond), `cardById`, `issueCard` → `{ card, number, replayed }`, `transitionCard`. |
-| `src/data/store.ts`, `src/data/generate.ts` | change | A `cards` slice and an `issuedRequests` index — both on the store, so a reload keeps them — plus three cards seeded through the real generator pinned to `GENERATED_AT`: one active, one past 80% (the amber case), one frozen. |
+| `src/data/store.ts`, `src/data/generate.ts` | change | A `cards` slice and an `issuedRequests` index — both on the store, so a reload keeps them — plus three cards seeded through the real generator pinned to `GENERATED_AT`: one active, one past 80% (the amber case), one frozen. **Each seeded card's `spent` is the sum of a prefix of its own merchant's captured payments, never an invented figure**; the limits are round numbers, since a limit is an input ops chooses. |
 | `src/app/api/cards/route.ts` | add | `GET` masked list. `POST`: `400 {message, fields}`, `201 {card, number, replayed}`, or `200` with `number: null` on a replay. `cache-control: no-store` on every response. |
 | `src/app/api/cards/[id]/route.ts` | add | `GET` one card (404 on a miss). `PATCH`: 400 bad status, 404 unknown, 409 illegal, 200 + card. |
 | `src/app/cards/page.tsx`, `issue-dialog.tsx`, `card-actions.tsx`, `[id]/page.tsx` | add | List with a written empty state; `Drawer` form → one-time reveal cleared on close, where one `Field` renders a Select or an Input since the label/error/aria plumbing is identical and a replay shows the mask rather than a second PAN; freeze and unfreeze via `PATCH` + `router.refresh()`, `—` for a cancelled card; full record and spend bar, amber past 80%, created date in the merchant's timezone. |
@@ -65,13 +65,15 @@ The full number exists only as the return value of `issueCard` and the body of t
 7. **The spend bar's width is a literal Tailwind class, not an inline `style`.** `components.md:10` forbids inline styles, and a computed percentage is the one thing the JIT cannot see — so the bar picks from a 21-entry table of literal `w-[n%]` classes at 5% steps. `spendPercent` is a whole number clamped at 100, and the caption and `aria-valuenow` carry that same rounded figure; an over-limit card therefore reads "100%", a known limit of this ticket rather than a hidden one.
 8. **A nickname is required and capped at 60 characters, and a limit must be whole minor units.** The ticket names neither. A card with no nickname is unidentifiable in a list that shows no PAN, and a fractional minor unit is a money-rule violation arriving as valid JSON, so both are rejected as 400s beside the rules the ticket does name. **The category lock is optional** — absent, `null` and `""` all store `null` — because the ticket makes the lock a stretch goal, not a requirement.
 
+9. **Dates follow the repo's existing two-helper split, which reads like an inconsistency and is not one.** The list uses `formatDate` (UTC, date only) because `src/lib/dates.ts:30` defines it as the table formatter — "tables are scanned not reconciled" — and the detail page uses `formatInZone` with the merchant's timezone, labelled with the zone so the reader knows which clock it is. Every baseline table does the same (`src/app/payments/page.tsx:126`, `src/app/disputes/page.tsx:70`, `src/app/payouts/page.tsx:81`) and the one baseline detail page uses the zone-aware helper (`src/app/payments/[id]/page.tsx:75`). Storage is UTC either way; only display converts.
+
 ## Plan
 
 Types and store slice → `src/lib` rules with their tests → `src/data/cards.ts` with its tests → route handlers with their tests → list, detail, dialog, actions → nav → browser verification → `/ship-ready` → `/pr` → push.
 
 ## Verification
 
-102 tests, `npm test`. Per criterion:
+103 tests, `npm test`. Per criterion:
 
 | Criterion | How it is proven |
 | --- | --- |
@@ -80,6 +82,7 @@ Types and store slice → `src/lib` rules with their tests → `src/data/cards.t
 | CORE-6 server-side validation | `cards.test.ts` a row per rejection through the pure parser; `api/cards/route.test.ts` the same rejections **over HTTP**, each a 400 naming its field, plus a non-JSON body in the same error shape |
 | RULE-3 state machine | `data/cards.test.ts` against the real store, and `api/cards/[id]/route.test.ts` walks every legal edge **over HTTP** — `frozen → frozen` 409, `cancelled` terminal 409, bad status 400, unknown card 404 |
 | Idempotency | `api/cards/route.test.ts`: a replayed `requestId` returns 200, `replayed: true`, `number: null`, the same card id, and adds no second card |
+| Seeded spend is real | `data/cards.test.ts`: every card's `spent` is a prefix sum of its merchant's captured payments and never exceeds its limit, and exactly one seeded card sits in the amber band |
 | CORE-1/2/3 issue, list, detail; stretch states | **By hand in the browser:** issue → the row appears → detail → freeze and unfreeze, plus the empty and error states. No automated test drives the UI, because `vitest.config.ts:13` is a node environment and no `.tsx` loads |
 | Every check | `tsc --noEmit`, `next lint`, `vitest run` on every push, via CI |
 

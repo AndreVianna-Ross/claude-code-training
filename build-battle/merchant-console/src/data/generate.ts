@@ -150,23 +150,33 @@ export function generate() {
   }
 
   const payouts = generatePayouts(payments)
-  return { payments, refunds, disputes, payouts, cards: generateCards() }
+  return {
+    payments,
+    refunds,
+    disputes,
+    payouts,
+    cards: generateCards(payments),
+  }
 }
 
-function generateCards(): Card[] {
+function generateCards(payments: Payment[]): Card[] {
   const seeds = [
-    ["Google Ads", 0, 250_000, 218_400, "advertising", "active", 28],
-    ["Figma seats", 2, 60_000, 14_900, "software", "active", 12],
+    ["Google Ads", 0, 140_000, 6, "advertising", "active", 28],
+    ["Figma seats", 2, 210_000, 2, "software", "active", 12],
     ["Contractor — Q3 audit", 4, 500_000, 0, "contractors", "frozen", 3],
   ] as const
 
   return seeds.map(
     (
-      [nickname, merchantIndex, spendLimit, spent, category, status, daysAgo],
+      [nickname, merchantIndex, spendLimit, draws, category, status, daysAgo],
       index,
     ) => {
       const merchant = merchants[merchantIndex]
       const number = generateCardNumber(rand)
+      const spent = payments
+        .filter((p) => p.merchantId === merchant.id && p.status === "captured")
+        .slice(0, draws)
+        .reduce((total, payment) => total + payment.amount, 0)
 
       return {
         id: `card_${pad(index + 1, 4)}`,
