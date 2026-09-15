@@ -1,15 +1,6 @@
 import { Card, CardCategory, CardStatus, Currency } from "@/data/types"
 
-/**
- * Card rules, all pure so they can be tested without HTTP or a store.
- *
- * Number generation and masking live in card-number.ts, which is the only
- * module that ever holds a full PAN.
- */
-
-/** The currencies cards are issued in. The allowlist, not a suggestion. */
 export const CARD_CURRENCIES: readonly Currency[] = ["USD", "EUR", "GBP"]
-
 export const CARD_CATEGORIES: readonly CardCategory[] = [
   "advertising",
   "software",
@@ -18,15 +9,9 @@ export const CARD_CATEGORIES: readonly CardCategory[] = [
   "utilities",
 ]
 
-/** A limit above this is refused. Minor units, so this is 50,000.00. */
 export const MAX_SPEND_LIMIT = 5_000_000
-
 export const NICKNAME_MAX = 60
 
-/**
- * The state machine. `cancelled` is terminal, which is why its list is empty
- * rather than absent — an empty list is a rule, a missing key is an oversight.
- */
 export const CARD_TRANSITIONS: Record<CardStatus, readonly CardStatus[]> = {
   active: ["frozen", "cancelled"],
   frozen: ["active", "cancelled"],
@@ -41,18 +26,12 @@ export function isCardStatus(value: unknown): value is CardStatus {
   return value === "active" || value === "frozen" || value === "cancelled"
 }
 
-/** What a validated issue request looks like once past the boundary. */
 export interface IssueCardInput {
   nickname: string
   merchantId: string
   spendLimit: number
   currency: Currency
   category: CardCategory | null
-  /**
-   * Caller-supplied key that makes issuing idempotent. A retry — a double
-   * click, a flaky connection, an impatient reload — carries the same key and
-   * gets the same card back instead of minting a second one.
-   */
   requestId: string | null
 }
 
@@ -64,15 +43,6 @@ export type ParseResult =
   | { ok: true; value: IssueCardInput }
   | { ok: false; errors: FieldErrors }
 
-/**
- * The boundary. Everything the client sends is checked against an allowlist
- * before it reaches the store (ORG-7): the merchant against the real ids, the
- * currency against the three we issue in, the limit against an integer range.
- *
- * `spendLimit` must already be MINOR UNITS. The decimal a human typed is
- * converted once, by parseAmountToMinorUnits at the form edge, and a bad
- * string never becomes a number here.
- */
 export function parseIssueRequest(
   body: unknown,
   merchants: readonly { id: string; currency: Currency }[],
@@ -88,8 +58,7 @@ export function parseIssueRequest(
     errors.nickname = `Keep the nickname under ${NICKNAME_MAX} characters.`
   }
 
-  const merchantId =
-    typeof input.merchantId === "string" ? input.merchantId : ""
+  const merchantId = typeof input.merchantId === "string" ? input.merchantId : ""
   const merchant = merchants.find((entry) => entry.id === merchantId) ?? null
   if (!merchantId) {
     errors.merchantId = "Choose a merchant."
@@ -110,19 +79,11 @@ export function parseIssueRequest(
   if (!CARD_CURRENCIES.includes(currency as Currency)) {
     errors.currency = "Cards are issued in USD, EUR or GBP."
   } else if (merchant && currency !== merchant.currency) {
-    // A card settles where its merchant settles. Allowing a GBP card against
-    // a USD merchant would mean one relationship carrying two currencies, and
-    // the money rule forbids summing across currencies without converting.
     errors.currency = `That merchant settles in ${merchant.currency}.`
   }
 
-  // Absent is fine; present-but-unknown is not.
   let category: CardCategory | null = null
-  if (
-    input.category !== undefined &&
-    input.category !== null &&
-    input.category !== ""
-  ) {
+  if (input.category != null && input.category !== "") {
     if (CARD_CATEGORIES.includes(input.category as CardCategory)) {
       category = input.category as CardCategory
     } else {
@@ -132,6 +93,11 @@ export function parseIssueRequest(
 
   if (Object.keys(errors).length > 0) return { ok: false, errors }
 
+  const requestId =
+    typeof input.requestId === "string" && input.requestId.trim()
+      ? input.requestId.trim()
+      : null
+
   return {
     ok: true,
     value: {
@@ -140,28 +106,18 @@ export function parseIssueRequest(
       spendLimit: spendLimit as number,
       currency: currency as Currency,
       category,
-      requestId:
-        typeof input.requestId === "string" && input.requestId.trim()
-          ? input.requestId.trim()
-          : null,
+      requestId,
     },
   }
 }
 
-/** Spend against the limit, as a whole percentage, clamped to 0..100. */
 export function spendPercent(card: Pick<Card, "spent" | "spendLimit">): number {
   if (card.spendLimit <= 0) return 0
   return Math.min(100, Math.round((card.spent / card.spendLimit) * 100))
 }
 
-/** Past this, the progress bar warns. */
 export const SPEND_WARN_PERCENT = 80
 
-/**
- * Compared as integers rather than against spendPercent, which rounds: 80.004%
- * rounds to 80 and would read as "not past 80" when it is. Cross-multiplying
- * keeps both sides whole minor units, so no float touches an amount.
- */
 export function isSpendWarning(
   card: Pick<Card, "spent" | "spendLimit">,
 ): boolean {
@@ -177,7 +133,6 @@ export const CARD_CATEGORY_LABELS: Record<CardCategory, string> = {
   utilities: "Utilities",
 }
 
-/** Kept narrow on purpose: a card's own statuses, not any status. */
 export const CARD_STATUS_LABELS: Record<CardStatus, string> = {
   active: "Active",
   frozen: "Frozen",

@@ -159,18 +159,7 @@ export function generate() {
   return { payments, refunds, disputes, payouts, cards }
 }
 
-/**
- * A few cards already issued, so the list, the detail page and the spend bar
- * have something to show before anyone clicks Issue. One sits past 80% of its
- * limit, which is the case the progress bar warns on.
- *
- * Numbers come from the real server-side generator and are discarded the
- * moment the last four is taken — the seed holds no full number either.
- */
 function generateCards(): Card[] {
-  // [nickname, merchant index, limit, spent, category, status, days before
-  // GENERATED_AT]. Amounts are minor units. The second card sits past 80% of
-  // its limit on purpose: that is the case the spend bar warns on.
   const seeds = [
     ["Google Ads", 0, 250_000, 218_400, "advertising", "active", 28],
     ["Figma seats", 2, 60_000, 14_900, "software", "active", 12],
@@ -196,8 +185,6 @@ function generateCards(): Card[] {
         reference: cardReference(rand),
         category,
         status,
-        // Pinned to GENERATED_AT like every other seed here, so the dates do
-        // not drift with the wall clock between two runs.
         createdAt: new Date(
           GENERATED_AT.getTime() - daysAgo * 86_400_000,
         ).toISOString(),

@@ -2,7 +2,6 @@ import { cardById, transitionCard } from "@/data/cards"
 import { isCardStatus } from "@/lib/cards"
 import { NextRequest, NextResponse } from "next/server"
 
-/** One card. Masked — last4 only, never a full number. */
 export async function GET(
   _request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -16,10 +15,6 @@ export async function GET(
   return NextResponse.json({ card })
 }
 
-/**
- * Moves a card's status. The state machine is enforced here, not only in the
- * UI: `active ⇄ frozen`, either to `cancelled`, and `cancelled` is terminal.
- */
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -50,7 +45,6 @@ export async function PATCH(
           {
             message: `That card cannot move to ${status} from where it is.`,
           },
-          // 409: the request is well-formed, the card's current state refuses it.
           { status: 409 },
         )
   }

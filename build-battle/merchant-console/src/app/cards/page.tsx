@@ -70,40 +70,39 @@ export default function CardsPage() {
                 </TableCell>
               </TableRow>
             )}
-            {cards.map((card) => {
-              const merchant = merchantById(card.merchantId)
-              return (
-                <TableRow key={card.id}>
-                  <TableCell>
-                    <Link
-                      href={`/cards/${card.id}`}
-                      className="font-medium text-blue-600 hover:underline dark:text-blue-500"
-                    >
-                      {card.nickname}
-                    </Link>
-                    {card.category && (
-                      <span className="ml-2 text-xs text-gray-500">
-                        {CARD_CATEGORY_LABELS[card.category]}
-                      </span>
-                    )}
-                  </TableCell>
-                  <TableCell>{merchant?.name ?? card.merchantId}</TableCell>
-                  <TableCell className="font-mono tabular-nums text-gray-500">
-                    {maskedNumber(card.last4)}
-                  </TableCell>
-                  <TableCell className="text-right font-medium tabular-nums text-gray-900 dark:text-gray-50">
-                    {formatMoney(card.spendLimit, card.currency)}
-                  </TableCell>
-                  <TableCell>
-                    <CardStatusBadge status={card.status} />
-                  </TableCell>
-                  <TableCell>{formatDate(card.createdAt)}</TableCell>
-                  <TableCell className="text-right">
-                    <CardActions card={card} />
-                  </TableCell>
-                </TableRow>
-              )
-            })}
+            {cards.map((card) => (
+              <TableRow key={card.id}>
+                <TableCell>
+                  <Link
+                    href={`/cards/${card.id}`}
+                    className="font-medium text-blue-600 hover:underline dark:text-blue-500"
+                  >
+                    {card.nickname}
+                  </Link>
+                  {card.category && (
+                    <span className="ml-2 text-xs text-gray-500">
+                      {CARD_CATEGORY_LABELS[card.category]}
+                    </span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {merchantById(card.merchantId)?.name ?? card.merchantId}
+                </TableCell>
+                <TableCell className="font-mono tabular-nums text-gray-500">
+                  {maskedNumber(card.last4)}
+                </TableCell>
+                <TableCell className="text-right font-medium tabular-nums text-gray-900 dark:text-gray-50">
+                  {formatMoney(card.spendLimit, card.currency)}
+                </TableCell>
+                <TableCell>
+                  <CardStatusBadge status={card.status} />
+                </TableCell>
+                <TableCell>{formatDate(card.createdAt)}</TableCell>
+                <TableCell className="text-right">
+                  <CardActions card={card} />
+                </TableCell>
+              </TableRow>
+            ))}
           </TableBody>
         </Table>
       </TableRoot>

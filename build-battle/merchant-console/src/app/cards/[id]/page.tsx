@@ -15,33 +15,6 @@ import { cx } from "@/lib/utils"
 import Link from "next/link"
 import { notFound } from "next/navigation"
 
-/** One row of the card record. Eight of these, so it is worth a name. */
-function Row({
-  label,
-  children,
-  wide,
-  mono,
-}: {
-  label: string
-  children: React.ReactNode
-  wide?: boolean
-  mono?: boolean
-}) {
-  return (
-    <div className={wide ? "sm:col-span-2" : undefined}>
-      <dt className="text-sm text-gray-500">{label}</dt>
-      <dd
-        className={cx(
-          "text-sm text-gray-900 dark:text-gray-50",
-          mono ? "font-mono" : "font-medium tabular-nums",
-        )}
-      >
-        {children}
-      </dd>
-    </div>
-  )
-}
-
 export default async function CardDetail({
   params,
 }: {
@@ -96,7 +69,6 @@ export default async function CardDetail({
             {formatMoney(card.spendLimit, card.currency)} · {percent}%
           </p>
         </div>
-
         <div
           className="mt-2 h-2.5 w-full overflow-hidden rounded-full bg-gray-200 dark:bg-gray-800"
           role="progressbar"
@@ -110,9 +82,6 @@ export default async function CardDetail({
               "h-full rounded-full transition-all",
               warning ? "bg-amber-500" : "bg-blue-500",
             )}
-            // A computed width is the one thing Tailwind cannot express: the
-            // JIT only sees literal class strings. The repo's own components
-            // do the same for derived values (Drawer.tsx:59, BarChart.tsx:399).
             style={{ width: `${percent}%` }}
           />
         </div>
@@ -127,24 +96,38 @@ export default async function CardDetail({
       <Divider />
 
       <dl className="grid grid-cols-1 gap-x-8 gap-y-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Row label="Merchant">{merchant?.name ?? card.merchantId}</Row>
-        <Row label="Spend limit">
-          {formatMoney(card.spendLimit, card.currency)} {card.currency}
-        </Row>
-        <Row label="Spent">{formatMoney(card.spent, card.currency)}</Row>
-        <Row label="Number" mono>
-          {maskedNumber(card.last4)}
-        </Row>
-        <Row label="Reference" mono>
-          {card.reference}
-        </Row>
-        <Row label="Category lock">
-          {card.category ? CARD_CATEGORY_LABELS[card.category] : "None"}
-        </Row>
-        <Row label="Status">{CARD_STATUS_LABELS[card.status]}</Row>
-        <Row label={`Created (${zone})`} wide>
-          {formatInZone(card.createdAt, zone)}
-        </Row>
+        {(
+          [
+            ["Merchant", merchant?.name ?? card.merchantId, false],
+            [
+              "Spend limit",
+              `${formatMoney(card.spendLimit, card.currency)} ${card.currency}`,
+              false,
+            ],
+            ["Spent", formatMoney(card.spent, card.currency), false],
+            ["Number", maskedNumber(card.last4), true],
+            ["Reference", card.reference, true],
+            [
+              "Category lock",
+              card.category ? CARD_CATEGORY_LABELS[card.category] : "None",
+              false,
+            ],
+            ["Status", CARD_STATUS_LABELS[card.status], false],
+            [`Created (${zone})`, formatInZone(card.createdAt, zone), false],
+          ] as const
+        ).map(([label, value, mono]) => (
+          <div key={label}>
+            <dt className="text-sm text-gray-500">{label}</dt>
+            <dd
+              className={cx(
+                "text-sm text-gray-900 dark:text-gray-50",
+                mono ? "font-mono" : "font-medium tabular-nums",
+              )}
+            >
+              {value}
+            </dd>
+          </div>
+        ))}
       </dl>
 
       <p className="mt-6 text-sm text-gray-500">

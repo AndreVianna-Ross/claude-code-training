@@ -9,8 +9,6 @@ import {
   spendPercent,
 } from "./cards"
 
-// Objects, not ids: a card must settle in its merchant's currency, so the
-// parser needs the currency to check it against. mch_02 is EUR.
 const MERCHANTS = [
   { id: "mch_01", currency: "USD" },
   { id: "mch_02", currency: "EUR" },
@@ -32,7 +30,6 @@ describe("the card state machine", () => {
   })
 
   it("treats cancelled as terminal", () => {
-    // An empty list is a rule; a missing key would be an oversight.
     expect(CARD_TRANSITIONS.cancelled).toEqual([])
     expect(canTransition("cancelled", "active")).toBe(false)
     expect(canTransition("cancelled", "frozen")).toBe(false)
@@ -40,7 +37,6 @@ describe("the card state machine", () => {
   })
 
   it("refuses a move to the status a card is already in", () => {
-    // So a double click is reported rather than looking like it worked twice.
     expect(canTransition("active", "active")).toBe(false)
     expect(canTransition("frozen", "frozen")).toBe(false)
   })
@@ -57,8 +53,6 @@ describe("parseIssueRequest", () => {
     }
   })
 
-  // One row per way a request can be wrong: the interesting thing is the
-  // coverage of the set, not twenty near-identical bodies.
   const rejections: [string, object, keyof FieldErrors][] = [
     ["no merchant", { merchantId: "" }, "merchantId"],
     ["an unknown merchant", { merchantId: "mch_nope" }, "merchantId"],
@@ -89,7 +83,6 @@ describe("parseIssueRequest", () => {
   })
 
   it("accepts the limit exactly at the cap", () => {
-    // The bound is inclusive, which is the off-by-one worth pinning down.
     expect(
       parseIssueRequest({ ...valid, spendLimit: MAX_SPEND_LIMIT }, MERCHANTS).ok,
     ).toBe(true)
@@ -104,8 +97,6 @@ describe("parseIssueRequest", () => {
   })
 
   it("does not blame the currency when the merchant is the unknown one", () => {
-    // Otherwise a typo in the merchant reports two errors and the operator
-    // fixes the wrong field.
     const result = parseIssueRequest(
       { ...valid, merchantId: "mch_nope" },
       MERCHANTS,
@@ -168,15 +159,13 @@ describe("spend against the limit", () => {
     [0, 25000, 0],
     [12500, 25000, 50],
     [25000, 25000, 100],
-    [40000, 25000, 100], // clamped rather than reporting past 100
-    [100, 0, 0], // no division by zero
+    [40000, 25000, 100],
+    [100, 0, 0],
   ])("reports %i of %i as %i%%", (spent, spendLimit, percent) => {
     expect(spendPercent({ spent, spendLimit })).toBe(percent)
   })
 
   it("warns only past 80 percent", () => {
-    // 20001/25000 is 80.004%, which rounds to 80 — so this must compare as
-    // integers, or a card just past the line does not warn.
     expect(isSpendWarning({ spent: 20000, spendLimit: 25000 })).toBe(false)
     expect(isSpendWarning({ spent: 20001, spendLimit: 25000 })).toBe(true)
     expect(isSpendWarning({ spent: 24000, spendLimit: 25000 })).toBe(true)

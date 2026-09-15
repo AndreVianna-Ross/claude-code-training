@@ -19,7 +19,6 @@ interface Store {
   refunds: Refund[]
   disputes: Dispute[]
   payouts: Payout[]
-  /** Issued virtual cards. Never holds a full card number. */
   cards: Card[]
 }
 

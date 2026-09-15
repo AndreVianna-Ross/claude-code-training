@@ -24,14 +24,12 @@ export interface Merchant {
 export interface Payment {
   id: string
   merchantId: string
-  /** Integer minor units. Never a float. */
   amount: number
   currency: Currency
   status: PaymentStatus
   method: "card" | "wallet" | "bank_transfer"
   cardBrand: "visa" | "mastercard" | "amex" | null
   last4: string | null
-  /** ISO 8601, always UTC. */
   createdAt: string
   description: string
 }
@@ -73,7 +71,6 @@ export interface Payout {
 
 export type CardStatus = "active" | "frozen" | "cancelled"
 
-/** What a card is allowed to be spent on. Chosen at issue, never edited. */
 export type CardCategory =
   | "advertising"
   | "software"
@@ -81,29 +78,17 @@ export type CardCategory =
   | "contractors"
   | "utilities"
 
-/**
- * A virtual card.
- *
- * There is deliberately NO field for the full number. It exists only as the
- * return value of issueCard and the body of the creation response, so a leak
- * would need someone to add a field rather than forget to strip one.
- */
 export interface Card {
   id: string
   nickname: string
   merchantId: string
-  /** Integer minor units. Never a float. */
   spendLimit: number
-  /** Integer minor units, spent to date against the limit. */
   spent: number
   currency: Currency
-  /** The only part of the number that is kept. */
   last4: string
-  /** Opaque handle for the generated number. Not the number. */
   reference: string
   category: CardCategory | null
   status: CardStatus
-  /** ISO 8601, always UTC. */
   createdAt: string
 }
 
